@@ -1,6 +1,6 @@
 # 智能实验室器材管理柜-LwIP以太网部分
 
-> 本工程为智能实验室器材管理柜的以太网通信模块，基于STM32F429IGTx和LwIP协议栈实现。目前已完成以太网驱动的移植和LwIP协议栈的配置，支持基本的TCP/IP通信功能。
+> 本工程为智能实验室器材管理柜的以太网通信模块，基于STM32F429IGTx和LwIP协议栈实现。目前已完成以太网驱动的移植和LwIP协议栈的配置，已验证网络层功能，并具备TCP/IP应用开发基础。
 
 > [项目地址](https://github.com/Moyaoyyy/git-github.com-Moyaoyyy-SmartEquipmentCabinet_LwIP-STM32Net.git) 为保证项目的持续更新，请前往该地址fetch最新代码。
 
