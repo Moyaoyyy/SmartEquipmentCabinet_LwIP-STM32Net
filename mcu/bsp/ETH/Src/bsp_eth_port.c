@@ -1,6 +1,12 @@
 /**
  * @file    bsp_eth_port.c
+ * @author  Yukikaze
  * @brief   以太网（StdPeriph + FreeRTOS）底层初始化与中断同步
+ * @version 0.1
+ * @date    2025-12-30
+ * 
+ * @copyright Copyright (c) 2025 Yukikaze
+ * 
  */
 
 #include "bsp_eth_port.h"

@@ -152,10 +152,252 @@ mcu/
 
  ~~(5)到此为止了，我只完成了LwIP的移植并适配FreeRTOS，具体的应用开发还没写，请耐心等待后续commit。~~
 
-## 7、许可证
+
+## 7、如何生成Linker Map文件？
+在使用CMake构建工程时，可通过以下代码段配置生成Linker Map文件（.map）的选项。Linker Map文件包含了程序中各个符号的地址和大小信息，对于调试和优化非常有帮助。
+
+```cmake
+# ----------------------------------------------------------------------------
+# 生成 Linker Map 文件（.map）
+# ----------------------------------------------------------------------------
+target_link_options(${PROJECT_NAME}.elf PRIVATE
+    -Wl,-Map=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.map
+    -Wl,--cref
+)
+```
+其中：
+ -  `-Wl,-Map=...`：指定生成的.map文件的路径和名称。
+ -  `-Wl,--cref`：在.map文件中包含交叉引用信息，更利于排查“是谁引用了某个符号/段”。
+ -  `${CMAKE_BINARY_DIR}`：CMake的构建输出目录变量。
+ -  `${PROJECT_NAME}`：CMake项目名称变量。
+
+生成的.map文件将位于构建输出目录下，文件名为`${PROJECT_NAME}.map`。可以使用文本编辑器打开该文件，查看程序的内存布局和符号信息。
+
+## 8、如何快速查找Linker Map文件的核心内容？
+ - 使用Ctrl+F搜索 **Memory Configuration**，查看各个内存段的起始地址和大小。确认FLASH / RAM 起始地址是否符合预期。有没有越界警告。
+ - 搜索各段（.text / .rodata / .data / .bss）占用情况，确认各段大小是否合理。
+ > GNU ld 不像 Keil 那样一行汇总，但你可以这样做：
+
+ > Ctrl+F 使用正则匹配，输入 **`^\.(text|rodata|data|bss)\s+0x`**，即可过滤汇总行。
+
+## 9、分析.map文件：以本工程为例
+
+### **一、“根据链接脚本（.ld），GNU ld认为 MCU 的内存是这样分布的。”**
+  ```plaintext
+    Memory Configuration
+    Name             Origin             Length             Attributes
+    CCMRAM           0x10000000         0x00010000         xrw
+    RAM              0x20000000         0x00030000         xrw
+    FLASH            0x08000000         0x00100000         xr
+    *default*        0x00000000         0xffffffff
+  ```
+  ### （1） `CCMRAM  0x10000000  0x00010000  xrw`
+  
+这是 STM32F4 的 CCM RAM，起始地址：`0x10000000`，长度：`0x00010000` = 64 KB。
+  
+仅 CPU 可访问（DMA 访问不到）。
+
+适合：RTOS 栈、算法临时变量、高频访问数据
+
+  ### （2） `RAM  0x20000000  0x00030000  xrw`
+
+这是 STM32F4 的主 SRAM，起始地址：`0x20000000`，长度：`0x00030000` = 192 KB。
+
+包含：`.data`、`.bss`、heap、stack、lwIP 缓冲区等
+
+  ### （3） `FLASH  0x08000000  0x00100000  xr`
+
+这是 STM32F4 的 FLASH ，起始地址：`0x08000000`，长度：`0x00100000` = 1 MB。
+
+存放：`.text`、`.rodata`、中断向量表等
+
+  ### （4） `*default*  0x00000000  0xffffffff`
+
+**`*default*` 是什么？**
+
+`*default*` 不是一块真实存在的内存，它是链接器的“兜底区域”。
+
+**它存在的原因**
+
+只有在这两种情况之一：
+
+**情况1️⃣ ：你在 Map 中看到“重要段”进了 `*default*`**
+
+```plaintext
+.text.my_func   0x00000000   0x120
+*default*
+```
+
+这说明：
+
+ - 链接脚本没把 .text 放进 FLASH
+
+ - 这是严重错误
+
+**情况2️⃣ ：你自定义了段，却忘了在 .ld 里分配**
+
+```plaintext
+__attribute__((section(".ccm_data")))
+uint8_t buf[1024];
+```
+但 .ld 没有 .ccm_data → CCMRAM
+
+那它就会：
+
+```plaintext
+.ccm_data   0x00000000   0x400   *default*
+```
+这说明：
+
+ - 你自定义了 `.ccm_data` 段
+
+ - 但链接脚本没分配 `.ccm_data` 到 CCMRAM
+
+ - 链接器只能把它放进 `*default*`
+
+**在当前工程里，它是完全正常的**
+
+ - `.text` / `.data` / `.bss` 都已经正确进了 FLASH / RAM / CCMRAM
+ - `*default*` 只是存在，但没被用来承载关键内容
+
+  ### （5） Attributes：xrw / xr 是什么意思？
+- x：可执行（eXecutable）
+- r：可读（Readable）
+- w：可写（Writable）
+
+- FLASH xr：代码区，只能读和执行
+- RAM / CCMRAM xrw：数据区，可读写和执行
+
+### **二、GNU ld 链接器的“最终内存布局裁决书”。**
+
+```plaintext
+.text           0x080001b0      0xf3a8
+.rodata         0x0800f558      0xc64
+.data           0x20000000      0x6e8     load address 0x080101d0
+.bss            0x200006e8      0x21b50
+```
+
+## （1）.text —— 程序代码（FLASH）
+```plaintext
+.text           0x080001b0      0xf3a8
+```
+
+**含义：**
+  - 起始地址：`0x080001b0`（FLASH）
+  - 大小：`0x0f3a8` = 62,376 字节 ≈ 60.9 KB
+  - 内容：
+    - 所有函数代码
+    - 中断处理函数
+    - 启动后可执行的指令
+    - 
+**为什么不是从 `0x08000000` 开始？**
+  - `0x08000000` ~ `0x080001AF` 通常是：
+    - 中断向量表
+    - 启动代码（startup / Reset_Handler）
+
+### （2）.rodata —— 只读常量（FLASH）
+```plaintext
+.rodata         0x0800f558      0xc64
+```
+**含义：**
+  - 起始地址：`0x0800f558`（FLASH）
+  - 大小：`0x0c64` = 3,084 字节 ≈ 3.01 KB
+  - 内容：
+    - 字符串常量
+    - `const`变量
+    - 不可修改的全局变量
+
+### 👉 .text + .rodata = **FLASH 实际消耗的主体**
+
+### （3）.data —— 有初值的全局/静态变量（FLASH + RAM）
+```plaintext
+.data           0x20000000      0x6e8     load address 0x080101d0
+```
+
+这是最容易被误解的一行，但非常重要。
+
+1️⃣ **运行时位置（RAM）**
+  - 起始地址：`0x20000000`
+  - 大小：`0x06e8` = 1,752 字节 ≈ 1.71 KB
+
+也就是说
+``` c
+int a = 10;
+static uint8_t buf[100];
+```
+这些变量**最终在 RAM 中运行。**
+
+2️⃣ **初值存放位置（FLASH）**
+```plaintext
+ load address 0x080101d0
+```
+意思是：
+- 这些变量的**初始值**存放在 FLASH 的 `0x080101d0` 位置
+- 启动时由 **Reset_Handler 拷贝到 RAM**的 `0x20000000` 位置
+
+等价于 C 启动代码里的：
+```c
+memcpy(_sdata, _sidata, _edata - _sdata);
+```
+
+### （4）.bss —— 无初值的全局/静态变量（RAM）
+```plaintext
+.bss            0x200006e8      0x21b50
+```
+**含义：**
+  - 起始地址：`0x200006e8`
+  - 大小：`0x21b50` = 138,512 字节 ≈ 135.3 KB
+  - 内容：
+    - 所有未初始化的全局变量和静态变量
+    - 不占用 FLASH 空间
+
+## **10、“你们怎么办？只有天知道。”**
+
+当前mcu的内存分布：
+
+```arduino
+FLASH (1 MB)
+├── 向量表 / 启动代码
+├── .text      ≈ 60.9 KB
+├── .rodata    ≈ 3.1 KB
+├── .data 初值 ≈ 1.7 KB
+└── （剩余）
+
+RAM (192 KB)
+├── .data      ≈ 1.7 KB
+├── .bss       ≈ 134.8 KB  ← 绝对大头
+├── heap
+└── stack
+```
+
+**FLASH 非常充裕**
+
+`.text` + `.rodata` + `.data`(init) < 70 KB
+
+**RAM 资源紧张**
+
+`.data` = `0x6e8` → 1,768 B ≈ 1.7 KB
+
+`.bss` = `0x21b50` → 138,064 B ≈ **134.8 KB**
+
+**剩余 RAM：**
+
+196,608 - 139,832 = 56,776 B ≈ **55.4 KB**
+
+这 **55 KB** 还要给：
+
+- 主栈（MSP）/线程栈（PSP）
+
+- FreeRTOS 各任务栈（通常每个任务 1–4 KB 起步）
+
+- `.noinit`、DMA 缓冲、以太网描述符等（如果有）
+
+**要开始严格做内存管理了**
+
+## 11、许可证
 本工程采用 [MIT](LICENSE) 许可证，欢迎自由使用和修改，但请保留原作者信息。
 
-## 8、联系方式
+## 12、联系方式
 - @author: [Yukikaze](https://github.com/Moyaoyyy)
 - @email: moyaoyyy@gmail.com
 

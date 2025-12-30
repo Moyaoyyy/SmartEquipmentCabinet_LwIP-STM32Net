@@ -276,6 +276,14 @@ list(FILTER SRC_FILES EXCLUDE REGEX ".*/middleware/LwIP/src/netif/ethernetif\\.c
 add_executable(${PROJECT_NAME}.elf ${SRC_FILES} ${STARTUP_FILE})
 
 # ----------------------------------------------------------------------------
+# 生成 Linker Map 文件（.map）
+# ----------------------------------------------------------------------------
+target_link_options(${PROJECT_NAME}.elf PRIVATE
+    -Wl,-Map=${CMAKE_BINARY_DIR}/${PROJECT_NAME}.map
+    -Wl,--cref
+)
+
+# ----------------------------------------------------------------------------
 # 固件格式转换
 # ----------------------------------------------------------------------------
 # 在 ELF 文件生成后，自动转换为其他常用格式
