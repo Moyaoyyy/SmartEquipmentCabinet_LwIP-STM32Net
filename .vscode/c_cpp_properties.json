@@ -29,6 +29,7 @@
                 "${workspaceFolder}/mcu/app/app_data/Inc",
                 "${workspaceFolder}/mcu/app/app_lwip/Inc",
                 "${workspaceFolder}/mcu/app/task_light/Inc",
+                "${workspaceFolder}/mcu/app/app_uplink/Inc",
                 
                 // 扩展工具库
                 "${workspaceFolder}/mcu/libx",

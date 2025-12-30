@@ -173,6 +173,20 @@ STM32F4x7 允许通过硬件计算和验证 IP、UDP、TCP 和 ICMP 校验和：
  */
 #define LWIP_SOCKET 0
 
+/**
+ * ---------------------------------------------------------------------------
+ * Socket/Netconn 超时选项（强烈建议开启）
+ * ---------------------------------------------------------------------------
+ *
+ * 说明：
+ * - 你当前工程使用 Netconn API（LWIP_NETCONN=1）。
+ * - 开启 LWIP_SO_RCVTIMEO / LWIP_SO_SNDTIMEO 后，netconn_recv/netconn_write
+ *   才能设置“接收/发送超时”，避免在网络异常时永久阻塞某个任务。
+ * - 这对 uplink HTTP 上报模块尤为重要。
+ */
+#define LWIP_SO_RCVTIMEO 1
+#define LWIP_SO_SNDTIMEO 1
+
 /*
    ---------------------------------
    ---------- OS 选项 ----------
