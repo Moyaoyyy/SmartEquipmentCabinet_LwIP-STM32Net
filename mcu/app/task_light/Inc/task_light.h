@@ -21,10 +21,10 @@
  * 任务配置参数
  * ============================================================================
  */
-#define TASK_LIGHT_NAME "Task_Light" /**< 任务名称 */
-#define TASK_LIGHT_STACK_SIZE 512    /**< 任务栈大小(字) */
-#define TASK_LIGHT_PRIORITY 3        /**< 任务优先级(中) */
-#define TASK_LIGHT_PERIOD_MS 1500    /**< 采集周期(毫秒) */
+#define TASK_LIGHT_NAME "Task_Light" /* 任务名称 */
+#define TASK_LIGHT_STACK_SIZE 512    /* 任务栈大小(字) */
+#define TASK_LIGHT_PRIORITY 3        /* 任务优先级(中) */
+#define TASK_LIGHT_PERIOD_MS 1500    /* 采集周期(毫秒) */
 
 /**
  * ============================================================================

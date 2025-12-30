@@ -31,8 +31,8 @@
 typedef struct
 {
     /* 光照数据 (由Task_Light更新) */
-    uint32_t light_adc;  /**< 光敏电阻ADC原始值(0-4095) */
-    uint8_t light_valid; /**< 光照数据有效标志(1=有效, 0=无效) */
+    uint32_t light_adc;  /* 光敏电阻ADC原始值(0-4095) */
+    uint8_t light_valid; /* 光照数据有效标志(1=有效, 0=无效) */
 
 } SensorData_TypeDef;
 
