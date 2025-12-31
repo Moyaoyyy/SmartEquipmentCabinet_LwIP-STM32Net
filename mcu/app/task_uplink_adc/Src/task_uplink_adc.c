@@ -112,7 +112,7 @@ BaseType_t Task_UplinkADC_Init(void)
     /**
      * 生成默认配置
      * - 默认值来自 uplink_config_set_defaults()
-     * - 这里再按任务宏覆盖 host/port/path，方便你集中修改
+     * - 这里再按任务宏覆盖 host/port/path，方便集中修改
      */
     uplink_config_set_defaults(&cfg);
 
