@@ -7,7 +7,19 @@
 - 返回 HTTP 200 + {"code":0}，让开发板判定成功并出队
 """
 
+import socket
+import socketserver
 from http.server import HTTPServer, BaseHTTPRequestHandler
+
+
+# 修复 Windows 主机名包含非 ASCII 字符导致的 UnicodeDecodeError
+class FixedHTTPServer(HTTPServer):
+    def server_bind(self):
+        # 跳过 getfqdn 调用，直接绑定
+        socketserver.TCPServer.server_bind(self)
+        host, port = self.server_address[:2]
+        self.server_name = host if host else "localhost"
+        self.server_port = port
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -17,9 +29,9 @@ class Handler(BaseHTTPRequestHandler):
         body = self.rfile.read(length) if length > 0 else b""
 
         try:
-            print(f"Received: {body.decode('utf-8', errors='replace')}")
+            print(f"[POST {self.path}] Received: {body.decode('utf-8', errors='replace')}")
         except Exception:
-            print("Received: <decode failed>")
+            print("[POST] Received: <decode failed>")
 
         # 返回 HTTP 200 + JSON
         self.send_response(200)
@@ -33,4 +45,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    HTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
+    BIND_IP = "0.0.0.0"  # 监听所有网卡
+    BIND_PORT = 8080
+
+    print(f"Starting server on {BIND_IP}:{BIND_PORT} ...")
+    print("Press Ctrl+C to stop.\n")
+
+    server = FixedHTTPServer((BIND_IP, BIND_PORT), Handler)
+    server.serve_forever()
