@@ -513,7 +513,7 @@ void uplink_poll(uplink_t *u)
                 uint32_t now2 = u->platform.now_ms(u->platform.user_ctx);
                 head->next_retry_ms = now2 + delay;
 
-                /* 可选：输出调试日志 */
+                /* 输出调试日志 */
                 uplink_logf(u,
                             UPLINK_LOG_WARN,
                             "[uplink] send failed: http=%u code=%ld attempt=%u next_delay=%lu ms\r\n",

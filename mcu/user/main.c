@@ -1,15 +1,21 @@
 /**
  * @file    main.c
  * @author  Yukikaze
- * @brief   主函数
+ * @brief   主函数入口（系统初始化 + 创建应用任务）
  * @version 0.1
- * @date    2025-12-05
- * @note    说明:
- *       - Task_Light:   周期1.5秒，读取光敏ADC值，优先级3，LED2(绿)
- *
+ * @date    2025-12-31
+ * 
+ * @note 说明：
+ * - 本文件负责系统时钟/外设初始化，并创建 FreeRTOS 任务。
+ * - 当前工程包含：
+ *   - Task_Light：周期采集光敏电阻 ADC，并把数据入队到 uplink。
+ *   - Task_UplinkADC：周期调用 uplink_poll()，驱动 HTTP JSON POST 发送。
+ * - LwIP_Init 必须在调度器启动后调用（当前 NO_SYS=0，使用 tcpip_thread）。
+ * 
  * @copyright Copyright (c) 2025 Yukikaze
- *
+ * 
  */
+
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -26,24 +32,17 @@
 /* 应用层任务头文件 */
 #include "app_data.h"
 #include "task_light.h"
+#include "task_uplink_adc.h"
 
 /* LwIP 网络协议栈头文件 */
 #include "netconf.h"
 
 /**
- * ============================================================================
  * 任务句柄定义
- * ============================================================================
  */
-
-/* AppTaskCreate任务句柄 */
 static TaskHandle_t AppTaskCreate_Handle = NULL;
 
-/**
- * ============================================================================
- * 私有函数声明
- * ============================================================================
- */
+
 
 static void BSP_Init(void);
 static void AppTaskCreate(void *pvParameters);
@@ -52,8 +51,6 @@ static void SystemClock_Config(void);
 /**
  * @brief 主函数
  * @author Yukikaze
- *
- * @return int 返回值(嵌入式系统中不会返回)
  *
  * @note 开发板硬件初始化
  *       创建APP应用任务
@@ -107,10 +104,7 @@ int main(void)
  * @note 初始化顺序:
  *       1. LED GPIO
  *       2. 串口(调试输出)
- *       3. DHT11温湿度传感器
- *       4. I2C总线(OLED使用)
- *       5. OLED显示屏
- *       6. 光敏电阻ADC
+ *       3. 光敏电阻ADC
  */
 static void BSP_Init(void)
 {
@@ -148,12 +142,11 @@ static void BSP_Init(void)
  * @note 为了方便管理，所有的任务创建函数都放在这个函数里面
  *       任务创建完成后删除自身，释放资源
  *
- *       任务优先级说明(数值越大优先级越高):
- *       - Task_Display: 优先级4 (高)
  */
 static void AppTaskCreate(void *pvParameters)
 {
     BaseType_t xReturn = pdPASS;
+    BaseType_t critical_entered = pdFALSE;
 
     /* 避免编译器警告 */
     (void)pvParameters;
@@ -163,17 +156,56 @@ static void AppTaskCreate(void *pvParameters)
     LwIP_Init();
     printf("LwIP Stack Initialized!\r\n");
 
-    /* 进入临界区(禁止任务调度) - 仅用于保护任务创建过程 */
-    taskENTER_CRITICAL();
 
-    /* 初始化共享数据模块 */
+    /**
+     * 初始化应用数据模块
+     * 
+     * 说明：
+     * - AppData 模块负责管理共享数据结构，供各任务读写。
+     */
     xReturn = AppData_Init();
+    if (pdPASS != xReturn)
+    {
+        goto error_no_critical;
+    }
+
+    /**
+     * 初始化 uplink 模块（HTTP:8080 JSON POST）
+     *
+     * 说明：
+     * - uplink_init 内部会创建互斥量，并绑定 HTTP(netconn) 传输层。
+     * - 必须在 LwIP_Init() 之后调用，确保 tcpip_thread 已创建运行。
+     */
+    xReturn = Task_UplinkADC_Init();
+    if (pdPASS != xReturn)
+    {
+        goto error_no_critical;
+    }
+
+    
+    /* 进入临界区（禁止任务切换）：仅用于保护“创建任务”的过程 */
+    taskENTER_CRITICAL();
+    critical_entered = pdTRUE;
+
+
+    /**
+     * 创建 uplink 发送任务（Task_UplinkADC）
+     *
+     * 说明：
+     * - Task_UplinkADC 会周期调用 uplink_poll()，驱动队列发送与重试退避。
+     */
+    xReturn = Task_UplinkADC_Create();
     if (pdPASS != xReturn)
     {
         goto error;
     }
 
-    /* 创建光照采集任务 */
+    /**
+     * 创建光照采集任务（Task_Light）
+     *
+     * 说明：
+     * - Task_Light 周期读取光敏电阻 ADC，并把数据入队到 uplink 模块。
+     */
     xReturn = Task_Light_Create();
     if (pdPASS != xReturn)
     {
@@ -181,15 +213,30 @@ static void AppTaskCreate(void *pvParameters)
     }
 
     /* 退出临界区后再删除自身任务，避免调度器一直被禁止 */
-    taskEXIT_CRITICAL();
+    if (critical_entered == pdTRUE)
+    {
+        taskEXIT_CRITICAL();
+        critical_entered = pdFALSE;
+    }
+    vTaskDelete(AppTaskCreate_Handle);
+    return;
+
+error_no_critical:
+    /* 初始化阶段失败（未进入临界区），直接点亮红灯并删除自身任务 */
+    LED_RED;
     vTaskDelete(AppTaskCreate_Handle);
     return;
 
 error:
     /* 任务创建失败 */
     LED_RED;
-    taskEXIT_CRITICAL();
+    if (critical_entered == pdTRUE)
+    {
+        taskEXIT_CRITICAL();
+        critical_entered = pdFALSE;
+    }
     vTaskDelete(AppTaskCreate_Handle);
+    return;
 }
 
 /**
