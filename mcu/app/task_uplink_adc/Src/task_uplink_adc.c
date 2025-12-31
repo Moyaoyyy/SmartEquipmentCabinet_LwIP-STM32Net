@@ -4,25 +4,24 @@
  * @brief   ADC 上报任务实现（任务层：周期驱动 uplink_poll）
  * @version 0.1
  * @date    2025-12-31
- * 
+ *
  * @note 说明：
  * - 在系统启动阶段初始化 uplink 模块（HTTP:8080，JSON POST）。
  * - 创建并运行 Task_UplinkADC 任务，周期调用 uplink_poll()，驱动发送队列数据。
  * - 采集 ADC 的任务是 task_light，本任务不采集，只负责发送。
- * 
+ *
  * @copyright Copyright (c) 2025 Yukikaze
- * 
+ *
  */
 
 #include "task_uplink_adc.h"
 
 #include <string.h>
-#include <stdio.h>
 
 /**
- * 
+ *
  * 全局变量定义
- * 
+ *
  */
 
 /** uplink 全局上下文：供 task_light 等任务调用 uplink_enqueue_* 使用 */
@@ -32,9 +31,9 @@ uplink_t g_uplink;
 TaskHandle_t Task_UplinkADC_Handle = NULL;
 
 /**
- * 
+ *
  * 内部工具函数
- * 
+ *
  */
 
 /**
@@ -45,31 +44,13 @@ TaskHandle_t Task_UplinkADC_Handle = NULL;
  * @param level 日志等级（当前仅用于区分前缀）
  * @param message 已格式化好的字符串（以 '\0' 结尾）
  *
- * @note
- * - 这里直接使用 printf，因此要求你的工程已初始化串口（USARTx_Config）。
- * - 如果你不想输出日志，可在 Task_UplinkADC_Init 中把 platform.log 置为 NULL。
  */
 static void Task_UplinkADC_Log(void *user_ctx, uplink_log_level_t level, const char *message)
 {
+    /* 禁用日志输出以节省资源 */
     (void)user_ctx;
-
-    /* 打印一个简单前缀，便于你在串口里筛选日志 */
-    switch (level)
-    {
-    case UPLINK_LOG_ERROR:
-        printf("[UPLINK][E] %s", message);
-        break;
-    case UPLINK_LOG_WARN:
-        printf("[UPLINK][W] %s", message);
-        break;
-    case UPLINK_LOG_INFO:
-        printf("[UPLINK][I] %s", message);
-        break;
-    case UPLINK_LOG_DEBUG:
-    default:
-        printf("[UPLINK][D] %s", message);
-        break;
-    }
+    (void)level;
+    (void)message;
 }
 
 /**
@@ -98,9 +79,9 @@ static void Task_UplinkADC_SetStr(char *dst, size_t dst_size, const char *src)
 }
 
 /**
- * 
+ *
  * 函数实现
- * 
+ *
  */
 
 BaseType_t Task_UplinkADC_Init(void)
@@ -137,14 +118,8 @@ BaseType_t Task_UplinkADC_Init(void)
     err = uplink_init(&g_uplink, &cfg, &platform);
     if (err != UPLINK_OK)
     {
-        printf("[UPLINK] uplink_init failed, err=%d\r\n", (int)err);
         return pdFAIL;
     }
-
-    printf("[UPLINK] init ok: %s:%u%s\r\n",
-           cfg.endpoint.host,
-           (unsigned)cfg.endpoint.port,
-           cfg.endpoint.path);
 
     return pdPASS;
 }
@@ -166,7 +141,7 @@ BaseType_t Task_UplinkADC_Create(void)
 
     if (xReturn != pdPASS)
     {
-        printf("[UPLINK] Task_UplinkADC create failed\r\n");
+        /* 任务创建失败 */
     }
     return xReturn;
 }

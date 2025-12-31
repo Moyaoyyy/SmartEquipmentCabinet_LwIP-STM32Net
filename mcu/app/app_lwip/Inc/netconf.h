@@ -48,8 +48,9 @@ extern "C"
 
 // #define USE_DHCP       /* enable DHCP, if disabled static address is used */
 
-/* 调试信息输出 */
-#define SERIAL_DEBUG
+/* 调试信息输出（注释掉以禁用调试打印，节省资源） */
+// #define SERIAL_DEBUG
+
 /* 远端IP地址和端口 */
 #define DEST_IP_ADDR0 172
 #define DEST_IP_ADDR1 18

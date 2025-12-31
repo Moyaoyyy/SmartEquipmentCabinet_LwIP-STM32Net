@@ -59,9 +59,9 @@
 
 /* Debug macros */
 #ifdef SERIAL_DEBUG
-#define PRINT_INFO(fmt, ...) printf("[INFO] " fmt, ##__VA_ARGS__)
-#define PRINT_DEBUG(fmt, ...) printf("[DEBUG] " fmt, ##__VA_ARGS__)
-#define PRINT_ERR(fmt, ...) printf("[ERR] " fmt, ##__VA_ARGS__)
+#define PRINT_INFO(fmt, ...) printf("[INFO] " fmt "\r\n", ##__VA_ARGS__)
+#define PRINT_DEBUG(fmt, ...) printf("[DEBUG] " fmt "\r\n", ##__VA_ARGS__)
+#define PRINT_ERR(fmt, ...) printf("[ERR] " fmt "\r\n", ##__VA_ARGS__)
 #else
 #define PRINT_INFO(fmt, ...)
 #define PRINT_DEBUG(fmt, ...)
@@ -99,11 +99,11 @@ static void low_level_init(struct netif *netif)
 
     if (eth_init_status == 0)
     {
-        PRINT_INFO("ETH hardware init success\n");
+        PRINT_INFO("ETH hardware init success");
     }
     else
     {
-        PRINT_ERR("ETH hardware init failed!\n");
+        PRINT_ERR("ETH hardware init failed!");
     }
 
     /* set MAC hardware address length */
@@ -134,7 +134,7 @@ static void low_level_init(struct netif *netif)
                    NETIF_IN_TASK_STACK_SIZE, /* Task stack size */
                    NETIF_IN_TASK_PRIORITY);  /* Task priority */
 
-    PRINT_INFO("ETH input task created\n");
+    PRINT_INFO("ETH input task created");
 
     /* Link monitor task (poll PHY link status and call netif_set_link_up/down) */
     sys_thread_new("ETHLINK",
@@ -178,7 +178,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     if (p->tot_len >= 14)
     {
         u8 *data = (u8 *)p->payload;
-        PRINT_INFO("TX: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=%02X%02X len=%d\n",
+        PRINT_INFO("TX: dst=%02X:%02X:%02X:%02X:%02X:%02X src=%02X:%02X:%02X:%02X:%02X:%02X type=%02X%02X len=%d",
                    data[0], data[1], data[2], data[3], data[4], data[5],
                    data[6], data[7], data[8], data[9], data[10], data[11],
                    data[12], data[13], p->tot_len);
@@ -237,7 +237,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
     /* Prepare transmit descriptors to give to DMA*/
     ETH_Prepare_Transmit_Descriptors(framelength);
 
-    PRINT_DEBUG("TX: frame sent, len = %d\n", framelength);
+    PRINT_DEBUG("TX: frame sent, len = %d", framelength);
 
     errval = ERR_OK;
 
@@ -245,7 +245,7 @@ error:
 
     if (errval != ERR_OK)
     {
-        PRINT_ERR("TX: send failed, err = %d\n", errval);
+        PRINT_ERR("TX: send failed, err = %d", errval);
     }
 
     /* When Transmit Underflow flag is set, clear it and issue a Transmit Poll Demand to resume transmission */
@@ -293,7 +293,7 @@ static struct pbuf *low_level_input(struct netif *netif)
         return NULL;
     }
 
-    PRINT_DEBUG("receive frame len : %d\n", len);
+    PRINT_DEBUG("receive frame len : %d", len);
 
     /* We allocate a pbuf chain of pbufs from the Lwip buffer pool */
     p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
@@ -364,7 +364,7 @@ void ethernetif_input(void *pParams)
 
     netif = (struct netif *)pParams;
 
-    PRINT_INFO("ETH input task running\n");
+    PRINT_INFO("ETH input task running");
 
     while (1)
     {
@@ -438,25 +438,25 @@ static void ethernetif_link_thread(void *arg)
     struct netif *netif = (struct netif *)arg;
     uint8_t last_link = 0xFF;
 
-    PRINT_INFO("ETH link monitor thread started\n");
+    PRINT_INFO("ETH link monitor thread started");
 
     while (1)
     {
         uint8_t link_up = Bsp_Eth_IsLinkUp();
 
-        PRINT_DEBUG("PHY link status: %d\n", link_up);
+        PRINT_DEBUG("PHY link status: %d", link_up);
 
         if (last_link == 0xFF)
         {
             last_link = link_up;
             if (link_up)
             {
-                PRINT_INFO("ETH link UP (initial)\n");
+                PRINT_INFO("ETH link UP (initial)");
                 (void)tcpip_callback(ethernetif_netif_set_link_up, netif);
             }
             else
             {
-                PRINT_INFO("ETH link DOWN (initial)\n");
+                PRINT_INFO("ETH link DOWN (initial)");
                 (void)tcpip_callback(ethernetif_netif_set_link_down, netif);
             }
         }
@@ -465,12 +465,12 @@ static void ethernetif_link_thread(void *arg)
             last_link = link_up;
             if (link_up)
             {
-                PRINT_INFO("ETH link UP\n");
+                PRINT_INFO("ETH link UP");
                 (void)tcpip_callback(ethernetif_netif_set_link_up, netif);
             }
             else
             {
-                PRINT_INFO("ETH link DOWN\n");
+                PRINT_INFO("ETH link DOWN");
                 (void)tcpip_callback(ethernetif_netif_set_link_down, netif);
             }
         }
@@ -508,30 +508,30 @@ void ethernetif_update_config(struct netif *netif)
                  (timeout < (uint32_t)PHY_READ_TO));
 
         regvalue = ETH_ReadPHYRegister(BSP_ETH_PHY_ADDRESS, PHY_SR);
-        PRINT_INFO("PHY_SR = 0x%04X\n", regvalue);
+        PRINT_INFO("PHY_SR = 0x%04X", regvalue);
 
         maccr = ETH->MACCR;
         maccr &= ~(ETH_MACCR_FES | ETH_MACCR_DM);
 
         if ((regvalue & PHY_DUPLEX_STATUS) != (uint16_t)RESET)
         {
-            PRINT_INFO("Duplex: Full\n");
+            PRINT_INFO("Duplex: Full");
             maccr |= ETH_Mode_FullDuplex;
         }
         else
         {
-            PRINT_INFO("Duplex: Half\n");
+            PRINT_INFO("Duplex: Half");
             maccr |= ETH_Mode_HalfDuplex;
         }
 
         if (regvalue & PHY_SPEED_STATUS)
         {
-            PRINT_INFO("Speed: 10Mbps\n");
+            PRINT_INFO("Speed: 10Mbps");
             maccr |= ETH_Speed_10M;
         }
         else
         {
-            PRINT_INFO("Speed: 100Mbps\n");
+            PRINT_INFO("Speed: 100Mbps");
             maccr |= ETH_Speed_100M;
         }
 
@@ -542,13 +542,13 @@ void ethernetif_update_config(struct netif *netif)
 
         ETH_Start();
         netif_set_up(netif);
-        PRINT_INFO("netif is UP\n");
+        PRINT_INFO("netif is UP");
     }
     else
     {
         ETH_Stop();
         netif_set_down(netif);
-        PRINT_INFO("netif is DOWN\n");
+        PRINT_INFO("netif is DOWN");
     }
 
     ethernetif_notify_conn_changed(netif);

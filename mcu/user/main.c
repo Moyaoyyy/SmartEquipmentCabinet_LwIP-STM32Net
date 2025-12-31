@@ -4,18 +4,17 @@
  * @brief   主函数入口（系统初始化 + 创建应用任务）
  * @version 0.1
  * @date    2025-12-31
- * 
+ *
  * @note 说明：
  * - 本文件负责系统时钟/外设初始化，并创建 FreeRTOS 任务。
  * - 当前工程包含：
  *   - Task_Light：周期采集光敏电阻 ADC，并把数据入队到 uplink。
  *   - Task_UplinkADC：周期调用 uplink_poll()，驱动 HTTP JSON POST 发送。
  * - LwIP_Init 必须在调度器启动后调用（当前 NO_SYS=0，使用 tcpip_thread）。
- * 
+ *
  * @copyright Copyright (c) 2025 Yukikaze
- * 
+ *
  */
-
 
 #include "FreeRTOS.h"
 #include "task.h"
@@ -41,8 +40,6 @@
  * 任务句柄定义
  */
 static TaskHandle_t AppTaskCreate_Handle = NULL;
-
-
 
 static void BSP_Init(void);
 static void AppTaskCreate(void *pvParameters);
@@ -73,8 +70,6 @@ int main(void)
                           (void *)NULL,
                           (UBaseType_t)1,
                           (TaskHandle_t *)&AppTaskCreate_Handle);
-
-    printf("AppTaskCreate Task Created!\r\n");
 
     // 创建成功，启动调度器
     if (pdPASS == xReturn)
@@ -119,7 +114,6 @@ static void BSP_Init(void)
 
     /* 串口初始化 */
     USARTx_Config();
-    printf("USART Initialized\r\n");
 
     /* 简单延时 */
     for (i = 0; i < 1800000; i++)
@@ -130,7 +124,6 @@ static void BSP_Init(void)
 
     /* 光敏电阻ADC初始化 */
     PhotoResistor_Init();
-    printf("PhotoResistor ADC Initialized\r\n");
 }
 
 /**
@@ -154,12 +147,10 @@ static void AppTaskCreate(void *pvParameters)
     /* 初始化 LwIP 协议栈 (创建 tcpip_thread 并挂载网卡) */
     /* 注意: 必须在调度器启动后调用，且不能在临界区内 */
     LwIP_Init();
-    printf("LwIP Stack Initialized!\r\n");
-
 
     /**
      * 初始化应用数据模块
-     * 
+     *
      * 说明：
      * - AppData 模块负责管理共享数据结构，供各任务读写。
      */
@@ -182,11 +173,9 @@ static void AppTaskCreate(void *pvParameters)
         goto error_no_critical;
     }
 
-    
     /* 进入临界区（禁止任务切换）：仅用于保护“创建任务”的过程 */
     taskENTER_CRITICAL();
     critical_entered = pdTRUE;
-
 
     /**
      * 创建 uplink 发送任务（Task_UplinkADC）
