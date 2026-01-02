@@ -10,6 +10,7 @@
  * - 当前工程包含：
  *   - Task_Light：周期采集光敏电阻 ADC，并把数据入队到 uplink。
  *   - Task_UplinkADC：周期调用 uplink_poll()，驱动 HTTP JSON POST 发送。
+ *   - Task_Lvgl：LVGL GUI 任务，驱动 LCD + 触摸屏。
  * - LwIP_Init 必须在调度器启动后调用（当前 NO_SYS=0，使用 tcpip_thread）。
  *
  * @copyright Copyright (c) 2025 Yukikaze
@@ -32,6 +33,7 @@
 #include "app_data.h"
 #include "task_light.h"
 #include "task_uplink_adc.h"
+#include "task_lvgl.h"
 
 /* LwIP 网络协议栈头文件 */
 #include "netconf.h"
@@ -173,6 +175,16 @@ static void AppTaskCreate(void *pvParameters)
         goto error_no_critical;
     }
 
+    /**
+     * @brief 初始化 LVGL + LCD/Touch（需 SDRAM 可用）
+     * 
+     */
+    xReturn = Task_Lvgl_Init();
+    if (pdPASS != xReturn)
+    {
+        goto error_no_critical;
+    }
+
     /* 进入临界区（禁止任务切换）：仅用于保护“创建任务”的过程 */
     taskENTER_CRITICAL();
     critical_entered = pdTRUE;
@@ -196,6 +208,16 @@ static void AppTaskCreate(void *pvParameters)
      * - Task_Light 周期读取光敏电阻 ADC，并把数据入队到 uplink 模块。
      */
     xReturn = Task_Light_Create();
+    if (pdPASS != xReturn)
+    {
+        goto error;
+    }
+
+    /**
+     * @brief 创建 LVGL GUI 任务（Task_Lvgl）
+     * 
+     */
+    xReturn = Task_Lvgl_Create();
     if (pdPASS != xReturn)
     {
         goto error;

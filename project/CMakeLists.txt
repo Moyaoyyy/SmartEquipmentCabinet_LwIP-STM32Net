@@ -90,6 +90,15 @@ set(LWIP_INC_DIR ${LWIP_DIR}/src/include)
 # LwIP port 目录
 set(LWIP_PORT_DIR ${LWIP_DIR}/port)
 
+# ----------------------------------------------------------------------------
+# LVGL 配置
+# ----------------------------------------------------------------------------
+# LVGL 根目录
+set(LVGL_DIR ${MCU_DIR}/middleware/lvgl)
+
+# LVGL 源文件目录
+set(LVGL_SRC_DIR ${LVGL_DIR}/src)
+
 # FreeRTOS 头文件目录：包含 FreeRTOS.h、task.h 等核心头文件
 set(FRTOS_INC_DIR ${FREERTOS_DIR}/include)
 
@@ -171,6 +180,16 @@ include_directories(
     # LwIP port 层头文件
     ${LWIP_PORT_DIR}
     
+    # ========== LVGL 头文件 ==========
+    # LVGL 根目录（包含 lvgl.h、lv_conf.h）
+    ${LVGL_DIR}
+    
+    # LVGL 源码目录（包含各模块头文件）
+    ${LVGL_SRC_DIR}
+    
+    # LVGL Port（项目与 LCD/Touch 的对接层）
+    ${LVGL_DIR}/port
+    
     # ========== FreeRTOS 头文件 ==========
     # FreeRTOS 核心头文件目录
     ${FRTOS_INC_DIR}
@@ -234,6 +253,31 @@ file(GLOB_RECURSE SRC_FILES
     
     # LwIP 网络接口层实现
     ${LWIP_DIR}/src/netif/*.c
+
+
+    # ========== LVGL 源码 ==========
+    # LVGL 初始化
+    ${LVGL_SRC_DIR}/*.c
+    
+    # LVGL 各模块源码（递归包含所有子目录）
+    ${LVGL_SRC_DIR}/core/*.c
+    ${LVGL_SRC_DIR}/display/*.c
+    ${LVGL_SRC_DIR}/draw/*.c
+    ${LVGL_SRC_DIR}/draw/**/*.c
+    ${LVGL_SRC_DIR}/font/*.c
+    ${LVGL_SRC_DIR}/indev/*.c
+    ${LVGL_SRC_DIR}/layouts/**/*.c
+    ${LVGL_SRC_DIR}/libs/**/*.c
+    ${LVGL_SRC_DIR}/misc/*.c
+    ${LVGL_SRC_DIR}/osal/*.c
+    ${LVGL_SRC_DIR}/others/**/*.c
+    ${LVGL_SRC_DIR}/stdlib/*.c
+    ${LVGL_SRC_DIR}/themes/**/*.c
+    ${LVGL_SRC_DIR}/tick/*.c
+    ${LVGL_SRC_DIR}/widgets/**/*.c
+
+    # LVGL Port（项目移植层）
+    ${LVGL_DIR}/port/*.c
 
 
     # ========== 用户代码 ==========

@@ -53,9 +53,9 @@ extern "C"
  * ============================================================================
  *
  * 说明：
- * - 如果你后端在 PC 上临时用监听程序接收（Wireshark 验证），这里建议 host 填 PC 的 IP。
+ * - 如果后端在 PC 上用监听程序接收（Wireshark 验证），这里 host 填 PC 的 IP。
  * - 默认端口使用 8080（HTTP 明文，方便抓包看到 JSON）。
- * - 默认路径为 /api/uplink（你可按后端接口修改）。
+ * - 默认路径为 /api/uplink（按后端接口修改）。
  */
 
 #ifndef TASK_UPLINK_ADC_SERVER_HOST
