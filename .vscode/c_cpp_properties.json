@@ -36,7 +36,6 @@
                 "${workspaceFolder}/mcu/app/task_light/Inc",
                 "${workspaceFolder}/mcu/app/app_uplink/Inc",
                 "${workspaceFolder}/mcu/app/task_uplink_adc/Inc",
-                "${workspaceFolder}/mcu/app/app_touch/Inc",
                 "${workspaceFolder}/mcu/app/task_lvgl/Inc",
                 
                 // 扩展工具库

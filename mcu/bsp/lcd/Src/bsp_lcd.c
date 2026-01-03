@@ -4,65 +4,62 @@
  * @brief   LCD应用函数接口，支持RGB888/565（含中文显示）
  * @version 0.1
  * @date    2026-01-02
- * 
+ *
  * @copyright Copyright (c) 2026 王俊伟
- * 
+ *
  */
-  
 
 /* Includes ------------------------------------------------------------------*/
 #include "bsp_lcd.h"
 
-
+#include <stdio.h>
 
 /** @addtogroup Utilities
-  * @{
-  */ 
+ * @{
+ */
 
 /** @addtogroup STM32F4_DISCOVERY
-  * @{
-  */ 
+ * @{
+ */
 
 /** @addtogroup STM32F429I_DISCOVERY
-  * @{
-  */
-    
-/** @defgroup STM32F429I_DISCOVERY_LCD 
-  * @brief This file includes the LCD driver for (ILI9341) 
-  * @{
-  */ 
+ * @{
+ */
+
+/** @defgroup STM32F429I_DISCOVERY_LCD
+ * @brief This file includes the LCD driver for (ILI9341)
+ * @{
+ */
 
 /** @defgroup STM32F429I_DISCOVERY_LCD_Private_TypesDefinitions
-  * @{
-  */ 
+ * @{
+ */
 /**
-  * @}
-  */ 
+ * @}
+ */
 
 /** @defgroup STM32F429I_DISCOVERY_LCD_Private_Defines
-  * @{
-  */
+ * @{
+ */
 
-#define POLY_Y(Z)          ((int32_t)((Points + Z)->X))
-#define POLY_X(Z)          ((int32_t)((Points + Z)->Y))   
+#define POLY_Y(Z) ((int32_t)((Points + Z)->X))
+#define POLY_X(Z) ((int32_t)((Points + Z)->Y))
 /**
-  * @}
-  */ 
+ * @}
+ */
 
 /** @defgroup STM32F429I_DISCOVERY_LCD_Private_Macros
-  * @{
-  */
-#define ABS(X)  ((X) > 0 ? (X) : -(X))    
+ * @{
+ */
+#define ABS(X) ((X) > 0 ? (X) : -(X))
 /**
-  * @}
-  */ 
-	
+ * @}
+ */
 
-#if  LCD_RGB_888
+#if LCD_RGB_888
 
-#else	
+#else
 /****************RG565驱动***************************RGB565驱动**********************************RGB565驱动*****************************RGB565驱动*****************************RGB565驱动*****************************/
-
 
 /**
  ******************************************************************************
@@ -100,8 +97,8 @@
  */
 static sFONT *LCD_Currentfonts;
 /* Global variables to set the written text color */
-static uint16_t CurrentTextColor   = 0x0000;
-static uint16_t CurrentBackColor   = 0xFFFF;
+static uint16_t CurrentTextColor = 0x0000;
+static uint16_t CurrentBackColor = 0xFFFF;
 /* Default LCD configuration with LCD Layer 1 */
 static uint32_t CurrentFrameBuffer = LCD_FRAME_BUFFER;
 static uint32_t CurrentLayer = LCD_BACKGROUND_LAYER;
@@ -115,87 +112,83 @@ static void LCD_GPIO_Config(void);
  * @}
  */
 
-
-
 /**
  * @brief  Initializes the LCD.
  * @param  None
  * @retval None
  */
 
-const uint8_t PIXEL_BPP[]={4,3,2,2,2,1,1,2};  
-
-
+const uint8_t PIXEL_BPP[] = {4, 3, 2, 2, 2, 1, 1, 2};
 
 void LCD_Init(void)
 {
- LTDC_InitTypeDef       LTDC_InitStruct;
+    LTDC_InitTypeDef LTDC_InitStruct;
 
- /* Enable the LTDC Clock */
- RCC_APB2PeriphClockCmd(RCC_APB2Periph_LTDC, ENABLE);
+    /* Enable the LTDC Clock */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_LTDC, ENABLE);
 
- /* Enable the DMA2D Clock */
- RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2D, ENABLE);
+    /* Enable the DMA2D Clock */
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2D, ENABLE);
 
- /* Configure the LCD Control pins */
- LCD_GPIO_Config();
+    /* Configure the LCD Control pins */
+    LCD_GPIO_Config();
 
- /* Configure the FMC Parallel interface : SDRAM is used as Frame Buffer for LCD */
- SDRAM_Init();
+    /* Configure the FMC Parallel interface : SDRAM is used as Frame Buffer for LCD */
+    SDRAM_Init();
 
- /* LTDC Configuration *********************************************************/
- /* Polarity configuration */
- /* Initialize the horizontal synchronization polarity as active low */
- LTDC_InitStruct.LTDC_HSPolarity = LTDC_HSPolarity_AL;
- /* Initialize the vertical synchronization polarity as active low */
- LTDC_InitStruct.LTDC_VSPolarity = LTDC_VSPolarity_AL;
- /* Initialize the data enable polarity as active low */
- LTDC_InitStruct.LTDC_DEPolarity = LTDC_DEPolarity_AL;
- /* Initialize the pixel clock polarity as input pixel clock */
- LTDC_InitStruct.LTDC_PCPolarity = LTDC_PCPolarity_IPC;
+    /* LTDC Configuration *********************************************************/
+    /* Polarity configuration */
+    /* Initialize the horizontal synchronization polarity as active low */
+    LTDC_InitStruct.LTDC_HSPolarity = LTDC_HSPolarity_AL;
+    /* Initialize the vertical synchronization polarity as active low */
+    LTDC_InitStruct.LTDC_VSPolarity = LTDC_VSPolarity_AL;
+    /* Initialize the data enable polarity as active low */
+    LTDC_InitStruct.LTDC_DEPolarity = LTDC_DEPolarity_AL;
+    /* Initialize the pixel clock polarity as input pixel clock */
+    LTDC_InitStruct.LTDC_PCPolarity = LTDC_PCPolarity_IPC;
 
- /* Configure R,G,B component values for LCD background color */
- LTDC_InitStruct.LTDC_BackgroundRedValue = 0;
- LTDC_InitStruct.LTDC_BackgroundGreenValue = 0;
- LTDC_InitStruct.LTDC_BackgroundBlueValue = 0;
+    /* Configure R,G,B component values for LCD background color */
+    LTDC_InitStruct.LTDC_BackgroundRedValue = 0;
+    LTDC_InitStruct.LTDC_BackgroundGreenValue = 0;
+    LTDC_InitStruct.LTDC_BackgroundBlueValue = 0;
 
-	/* 配置 PLLSAI 分频器，它的输出作为像素同步时钟CLK*/
-  /* PLLSAI_VCO 输入时钟 = HSE_VALUE/PLL_M = 1 Mhz */
-  /* PLLSAI_VCO 输出时钟 = PLLSAI_VCO输入 * PLLSAI_N = 250 Mhz */
-  /* PLLLCDCLK = PLLSAI_VCO 输出/PLLSAI_R = 250/5  Mhz */
-  /* LTDC 时钟频率 = PLLLCDCLK / DIV = 250/5/2 = 25 Mhz */
-	/* LTDC时钟太高会导花屏，若对刷屏速度要求不高，降低时钟频率可减少花屏现象*/
-	/* 以下函数三个参数分别为：PLLSAIN,PLLSAIQ,PLLSAIR，其中PLLSAIQ与LTDC无关*/
- RCC_PLLSAIConfig(250, 7, 5);
- 	/*以下函数的参数为DIV值*/
- RCC_LTDCCLKDivConfig(RCC_PLLSAIDivR_Div2);
+    /* 配置 PLLSAI 分频器，它的输出作为像素同步时钟CLK*/
+    /* PLLSAI_VCO 输入时钟 = HSE_VALUE/PLL_M = 1 Mhz */
+    /* PLLSAI_VCO 输出时钟 = PLLSAI_VCO输入 * PLLSAI_N = 250 Mhz */
+    /* PLLLCDCLK = PLLSAI_VCO 输出/PLLSAI_R = 250/5  Mhz */
+    /* LTDC 时钟频率 = PLLLCDCLK / DIV = 250/5/2 = 25 Mhz */
+    /* LTDC时钟太高会导花屏，若对刷屏速度要求不高，降低时钟频率可减少花屏现象*/
+    /* 以下函数三个参数分别为：PLLSAIN,PLLSAIQ,PLLSAIR，其中PLLSAIQ与LTDC无关*/
+    RCC_PLLSAIConfig(250, 7, 5);
+    /*以下函数的参数为DIV值*/
+    RCC_LTDCCLKDivConfig(RCC_PLLSAIDivR_Div2);
 
- /* Enable PLLSAI Clock */
- RCC_PLLSAICmd(ENABLE);
- /* Wait for PLLSAI activation */
- while(RCC_GetFlagStatus(RCC_FLAG_PLLSAIRDY) == RESET)
- {
- }
+    /* Enable PLLSAI Clock */
+    RCC_PLLSAICmd(ENABLE);
+    /* Wait for PLLSAI activation */
+    while (RCC_GetFlagStatus(RCC_FLAG_PLLSAIRDY) == RESET)
+    {
+    }
 
-  /* 时间参数配置 */  
- /* 配置行同步信号宽度(HSW-1) */
- LTDC_InitStruct.LTDC_HorizontalSync =HSW-1;
- /* 配置垂直同步信号宽度(VSW-1) */
- LTDC_InitStruct.LTDC_VerticalSync = VSW-1;
- /* 配置(HSW+HBP-1) */
- LTDC_InitStruct.LTDC_AccumulatedHBP =HSW+HBP-1;
- /* 配置(VSW+VBP-1) */
- LTDC_InitStruct.LTDC_AccumulatedVBP = VSW+VBP-1;
- /* 配置(HSW+HBP+有效像素宽度-1) */
- LTDC_InitStruct.LTDC_AccumulatedActiveW = HSW+HBP+LCD_PIXEL_WIDTH-1;
- /* 配置(VSW+VBP+有效像素高度-1) */
- LTDC_InitStruct.LTDC_AccumulatedActiveH = VSW+VBP+LCD_PIXEL_HEIGHT-1;
- /* 配置总宽度(HSW+HBP+有效像素宽度+HFP-1) */
- LTDC_InitStruct.LTDC_TotalWidth =HSW+ HBP+LCD_PIXEL_WIDTH  + HFP-1; 
- /* 配置总高度(VSW+VBP+有效像素高度+VFP-1) */
- LTDC_InitStruct.LTDC_TotalHeigh =VSW+ VBP+LCD_PIXEL_HEIGHT  + VFP-1;
+    /* 时间参数配置 */
+    /* 配置行同步信号宽度(HSW-1) */
+    LTDC_InitStruct.LTDC_HorizontalSync = HSW - 1;
+    /* 配置垂直同步信号宽度(VSW-1) */
+    LTDC_InitStruct.LTDC_VerticalSync = VSW - 1;
+    /* 配置(HSW+HBP-1) */
+    LTDC_InitStruct.LTDC_AccumulatedHBP = HSW + HBP - 1;
+    /* 配置(VSW+VBP-1) */
+    LTDC_InitStruct.LTDC_AccumulatedVBP = VSW + VBP - 1;
+    /* 配置(HSW+HBP+有效像素宽度-1) */
+    LTDC_InitStruct.LTDC_AccumulatedActiveW = HSW + HBP + LCD_PIXEL_WIDTH - 1;
+    /* 配置(VSW+VBP+有效像素高度-1) */
+    LTDC_InitStruct.LTDC_AccumulatedActiveH = VSW + VBP + LCD_PIXEL_HEIGHT - 1;
+    /* 配置总宽度(HSW+HBP+有效像素宽度+HFP-1) */
+    LTDC_InitStruct.LTDC_TotalWidth = HSW + HBP + LCD_PIXEL_WIDTH + HFP - 1;
+    /* 配置总高度(VSW+VBP+有效像素高度+VFP-1) */
+    LTDC_InitStruct.LTDC_TotalHeigh = VSW + VBP + LCD_PIXEL_HEIGHT + VFP - 1;
 
- LTDC_Init(&LTDC_InitStruct);
+    LTDC_Init(&LTDC_InitStruct);
 }
 
 /**
@@ -205,85 +198,85 @@ void LCD_Init(void)
  */
 void LCD_LayerInit(void)
 {
- LTDC_Layer_InitTypeDef LTDC_Layer_InitStruct;
+    LTDC_Layer_InitTypeDef LTDC_Layer_InitStruct;
 
-  /* 层窗口配置 */
-  /* 配置本层的窗口边界，注意这些参数是包含HBP HSW VBP VSW的 */    
-	//一行的第一个起始像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedHBP+1)的值
-	LTDC_Layer_InitStruct.LTDC_HorizontalStart = HBP + HSW;
-	//一行的最后一个像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedActiveW)的值
-	LTDC_Layer_InitStruct.LTDC_HorizontalStop = HSW+HBP+LCD_PIXEL_WIDTH-1;
-	//一列的第一个起始像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedVBP+1)的值
-	LTDC_Layer_InitStruct.LTDC_VerticalStart =  VBP + VSW;
-	//一列的最后一个像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedActiveH)的值
-	LTDC_Layer_InitStruct.LTDC_VerticalStop = VSW+VBP+LCD_PIXEL_HEIGHT-1;
+    /* 层窗口配置 */
+    /* 配置本层的窗口边界，注意这些参数是包含HBP HSW VBP VSW的 */
+    // 一行的第一个起始像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedHBP+1)的值
+    LTDC_Layer_InitStruct.LTDC_HorizontalStart = HBP + HSW;
+    // 一行的最后一个像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedActiveW)的值
+    LTDC_Layer_InitStruct.LTDC_HorizontalStop = HSW + HBP + LCD_PIXEL_WIDTH - 1;
+    // 一列的第一个起始像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedVBP+1)的值
+    LTDC_Layer_InitStruct.LTDC_VerticalStart = VBP + VSW;
+    // 一列的最后一个像素，该成员值应用为 (LTDC_InitStruct.LTDC_AccumulatedActiveH)的值
+    LTDC_Layer_InitStruct.LTDC_VerticalStop = VSW + VBP + LCD_PIXEL_HEIGHT - 1;
 
- /* Pixel Format configuration*/
- LTDC_Layer_InitStruct.LTDC_PixelFormat = LTDC_Pixelformat_RGB565;
- /* Alpha constant (255 totally opaque) */
- LTDC_Layer_InitStruct.LTDC_ConstantAlpha = 255;
- /* Default Color configuration (configure A,R,G,B component values) */
- LTDC_Layer_InitStruct.LTDC_DefaultColorBlue = 0;
- LTDC_Layer_InitStruct.LTDC_DefaultColorGreen = 0;
- LTDC_Layer_InitStruct.LTDC_DefaultColorRed = 0;
- LTDC_Layer_InitStruct.LTDC_DefaultColorAlpha = 0;
- /* Configure blending factors */
- LTDC_Layer_InitStruct.LTDC_BlendingFactor_1 = LTDC_BlendingFactor1_CA;
- LTDC_Layer_InitStruct.LTDC_BlendingFactor_2 = LTDC_BlendingFactor2_CA;
+    /* Pixel Format configuration*/
+    LTDC_Layer_InitStruct.LTDC_PixelFormat = LTDC_Pixelformat_RGB565;
+    /* Alpha constant (255 totally opaque) */
+    LTDC_Layer_InitStruct.LTDC_ConstantAlpha = 255;
+    /* Default Color configuration (configure A,R,G,B component values) */
+    LTDC_Layer_InitStruct.LTDC_DefaultColorBlue = 0;
+    LTDC_Layer_InitStruct.LTDC_DefaultColorGreen = 0;
+    LTDC_Layer_InitStruct.LTDC_DefaultColorRed = 0;
+    LTDC_Layer_InitStruct.LTDC_DefaultColorAlpha = 0;
+    /* Configure blending factors */
+    LTDC_Layer_InitStruct.LTDC_BlendingFactor_1 = LTDC_BlendingFactor1_CA;
+    LTDC_Layer_InitStruct.LTDC_BlendingFactor_2 = LTDC_BlendingFactor2_CA;
 
- /* the length of one line of pixels in bytes + 3 then :
- Line Lenth = Active high width x number of bytes per pixel + 3
- Active high width         = LCD_PIXEL_WIDTH
- number of bytes per pixel = 2    (pixel_format : RGB565)
- */
- LTDC_Layer_InitStruct.LTDC_CFBLineLength = ((LCD_PIXEL_WIDTH * 2) + 3);
- /* the pitch is the increment from the start of one line of pixels to the
- start of the next line in bytes, then :
- Pitch = Active high width x number of bytes per pixel */
- LTDC_Layer_InitStruct.LTDC_CFBPitch = (LCD_PIXEL_WIDTH * 2);
+    /* the length of one line of pixels in bytes + 3 then :
+    Line Lenth = Active high width x number of bytes per pixel + 3
+    Active high width         = LCD_PIXEL_WIDTH
+    number of bytes per pixel = 2    (pixel_format : RGB565)
+    */
+    LTDC_Layer_InitStruct.LTDC_CFBLineLength = ((LCD_PIXEL_WIDTH * 2) + 3);
+    /* the pitch is the increment from the start of one line of pixels to the
+    start of the next line in bytes, then :
+    Pitch = Active high width x number of bytes per pixel */
+    LTDC_Layer_InitStruct.LTDC_CFBPitch = (LCD_PIXEL_WIDTH * 2);
 
- /* Configure the number of lines */
- LTDC_Layer_InitStruct.LTDC_CFBLineNumber = LCD_PIXEL_HEIGHT;
+    /* Configure the number of lines */
+    LTDC_Layer_InitStruct.LTDC_CFBLineNumber = LCD_PIXEL_HEIGHT;
 
- /* Start Address configuration : the LCD Frame buffer is defined on SDRAM */
- LTDC_Layer_InitStruct.LTDC_CFBStartAdress = LCD_FRAME_BUFFER;
+    /* Start Address configuration : the LCD Frame buffer is defined on SDRAM */
+    LTDC_Layer_InitStruct.LTDC_CFBStartAdress = LCD_FRAME_BUFFER;
 
- /* Initialize LTDC layer 1 */
- LTDC_LayerInit(LTDC_Layer1, &LTDC_Layer_InitStruct);
+    /* Initialize LTDC layer 1 */
+    LTDC_LayerInit(LTDC_Layer1, &LTDC_Layer_InitStruct);
 
-  /* Configure Layer2 */
- /* Pixel Format configuration*/
- LTDC_Layer_InitStruct.LTDC_PixelFormat = LTDC_Pixelformat_RGB565;
- 
-  /* Start Address configuration : the LCD Frame buffer is defined on SDRAM w/ Offset */
- LTDC_Layer_InitStruct.LTDC_CFBStartAdress = LCD_FRAME_BUFFER + BUFFER_OFFSET;
+    /* Configure Layer2 */
+    /* Pixel Format configuration*/
+    LTDC_Layer_InitStruct.LTDC_PixelFormat = LTDC_Pixelformat_RGB565;
 
-  /* Configure blending factors */
- LTDC_Layer_InitStruct.LTDC_BlendingFactor_1 = LTDC_BlendingFactor1_PAxCA;
- LTDC_Layer_InitStruct.LTDC_BlendingFactor_2 = LTDC_BlendingFactor2_PAxCA;
+    /* Start Address configuration : the LCD Frame buffer is defined on SDRAM w/ Offset */
+    LTDC_Layer_InitStruct.LTDC_CFBStartAdress = LCD_FRAME_BUFFER + BUFFER_OFFSET;
 
-  /* Initialize LTDC layer 2 */
- LTDC_LayerInit(LTDC_Layer2, &LTDC_Layer_InitStruct);
+    /* Configure blending factors */
+    LTDC_Layer_InitStruct.LTDC_BlendingFactor_1 = LTDC_BlendingFactor1_PAxCA;
+    LTDC_Layer_InitStruct.LTDC_BlendingFactor_2 = LTDC_BlendingFactor2_PAxCA;
 
-  /* LTDC configuration reload */
- LTDC_ReloadConfig(LTDC_IMReload);
+    /* Initialize LTDC layer 2 */
+    LTDC_LayerInit(LTDC_Layer2, &LTDC_Layer_InitStruct);
 
-  /* Enable foreground & background Layers */
- LTDC_LayerCmd(LTDC_Layer1, ENABLE);
- LTDC_LayerCmd(LTDC_Layer2, ENABLE);
+    /* LTDC configuration reload */
+    LTDC_ReloadConfig(LTDC_IMReload);
 
-  /* LTDC configuration reload */
- LTDC_ReloadConfig(LTDC_IMReload);
+    /* Enable foreground & background Layers */
+    LTDC_LayerCmd(LTDC_Layer1, ENABLE);
+    LTDC_LayerCmd(LTDC_Layer2, ENABLE);
 
-  /* Set default font */
- LCD_SetFont(&LCD_DEFAULT_FONT);
+    /* LTDC configuration reload */
+    LTDC_ReloadConfig(LTDC_IMReload);
 
-  /* dithering activation */
- LTDC_DitherCmd(ENABLE);
+    /* Set default font */
+    LCD_SetFont(&LCD_DEFAULT_FONT);
+
+    /* dithering activation */
+    LTDC_DitherCmd(ENABLE);
+
+    /* 使能 LTDC 控制器 */
+    LTDC_Cmd(ENABLE);
 }
-
-
-
 
 /**
  * @brief  Sets the LCD Layer.
@@ -292,16 +285,16 @@ void LCD_LayerInit(void)
  */
 void LCD_SetLayer(uint32_t Layerx)
 {
- if (Layerx == LCD_BACKGROUND_LAYER)
- {
-   CurrentFrameBuffer = LCD_FRAME_BUFFER;
-   CurrentLayer = LCD_BACKGROUND_LAYER;
- }
- else
- {
-   CurrentFrameBuffer = LCD_FRAME_BUFFER + BUFFER_OFFSET;
-   CurrentLayer = LCD_FOREGROUND_LAYER;
- }
+    if (Layerx == LCD_BACKGROUND_LAYER)
+    {
+        CurrentFrameBuffer = LCD_FRAME_BUFFER;
+        CurrentLayer = LCD_BACKGROUND_LAYER;
+    }
+    else
+    {
+        CurrentFrameBuffer = LCD_FRAME_BUFFER + BUFFER_OFFSET;
+        CurrentLayer = LCD_FOREGROUND_LAYER;
+    }
 }
 
 /**
@@ -312,8 +305,8 @@ void LCD_SetLayer(uint32_t Layerx)
  */
 void LCD_SetColors(uint16_t TextColor, uint16_t BackColor)
 {
- CurrentTextColor = TextColor;
- CurrentBackColor = BackColor;
+    CurrentTextColor = TextColor;
+    CurrentBackColor = BackColor;
 }
 
 /**
@@ -326,8 +319,8 @@ void LCD_SetColors(uint16_t TextColor, uint16_t BackColor)
  */
 void LCD_GetColors(uint16_t *TextColor, uint16_t *BackColor)
 {
- *TextColor = CurrentTextColor;
- *BackColor = CurrentBackColor;
+    *TextColor = CurrentTextColor;
+    *BackColor = CurrentBackColor;
 }
 
 /**
@@ -337,7 +330,7 @@ void LCD_GetColors(uint16_t *TextColor, uint16_t *BackColor)
  */
 void LCD_SetTextColor(uint16_t Color)
 {
- CurrentTextColor = Color;
+    CurrentTextColor = Color;
 }
 
 /**
@@ -347,7 +340,7 @@ void LCD_SetTextColor(uint16_t Color)
  */
 void LCD_SetBackColor(uint16_t Color)
 {
- CurrentBackColor = Color;
+    CurrentBackColor = Color;
 }
 
 /**
@@ -357,7 +350,7 @@ void LCD_SetBackColor(uint16_t Color)
  */
 void LCD_SetFont(sFONT *fonts)
 {
- LCD_Currentfonts = fonts;
+    LCD_Currentfonts = fonts;
 }
 
 /**
@@ -369,15 +362,15 @@ void LCD_SetFont(sFONT *fonts)
  */
 void LCD_SetTransparency(uint8_t transparency)
 {
- if (CurrentLayer == LCD_BACKGROUND_LAYER)
- {
-   LTDC_LayerAlpha(LTDC_Layer1, transparency);
- }
- else
- {
-   LTDC_LayerAlpha(LTDC_Layer2, transparency);
- }
- LTDC_ReloadConfig(LTDC_IMReload);
+    if (CurrentLayer == LCD_BACKGROUND_LAYER)
+    {
+        LTDC_LayerAlpha(LTDC_Layer1, transparency);
+    }
+    else
+    {
+        LTDC_LayerAlpha(LTDC_Layer2, transparency);
+    }
+    LTDC_ReloadConfig(LTDC_IMReload);
 }
 
 /**
@@ -387,7 +380,7 @@ void LCD_SetTransparency(uint8_t transparency)
  */
 sFONT *LCD_GetFont(void)
 {
- return LCD_Currentfonts;
+    return LCD_Currentfonts;
 }
 
 /**
@@ -401,15 +394,15 @@ sFONT *LCD_GetFont(void)
  */
 void LCD_ClearLine(uint16_t Line)
 {
- uint16_t refcolumn = 0;
- /* Send the string character by character on lCD */
- while ((refcolumn < LCD_PIXEL_WIDTH) && (((refcolumn + LCD_Currentfonts->Width)& 0xFFFF) >= LCD_Currentfonts->Width))
- {
-   /* Display one character on LCD */
-   LCD_DisplayChar(Line, refcolumn, ' ');
-   /* Decrement the column position by 16 */
-   refcolumn += LCD_Currentfonts->Width;
- }
+    uint16_t refcolumn = 0;
+    /* Send the string character by character on lCD */
+    while ((refcolumn < LCD_PIXEL_WIDTH) && (((refcolumn + LCD_Currentfonts->Width) & 0xFFFF) >= LCD_Currentfonts->Width))
+    {
+        /* Display one character on LCD */
+        LCD_DisplayChar(Line, refcolumn, ' ');
+        /* Decrement the column position by 16 */
+        refcolumn += LCD_Currentfonts->Width;
+    }
 }
 
 /**
@@ -419,40 +412,38 @@ void LCD_ClearLine(uint16_t Line)
  */
 void LCD_Clear(uint16_t Color)
 {
-  
- DMA2D_InitTypeDef      DMA2D_InitStruct;
 
- uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
+    DMA2D_InitTypeDef DMA2D_InitStruct;
 
- Red_Value = (0xF800 & Color) >> 11;
- Blue_Value = 0x001F & Color;
- Green_Value = (0x07E0 & Color) >> 5;
+    uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
 
+    Red_Value = (0xF800 & Color) >> 11;
+    Blue_Value = 0x001F & Color;
+    Green_Value = (0x07E0 & Color) >> 5;
 
- /* configure DMA2D */
- DMA2D_DeInit();
- DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
- DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
- DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
- DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
- DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
- DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
- DMA2D_InitStruct.DMA2D_OutputMemoryAdd = CurrentFrameBuffer;
- DMA2D_InitStruct.DMA2D_OutputOffset = 0;
- DMA2D_InitStruct.DMA2D_NumberOfLine = LCD_PIXEL_HEIGHT;
- DMA2D_InitStruct.DMA2D_PixelPerLine = LCD_PIXEL_WIDTH;
- DMA2D_Init(&DMA2D_InitStruct);
+    /* configure DMA2D */
+    DMA2D_DeInit();
+    DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
+    DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
+    DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
+    DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
+    DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
+    DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
+    DMA2D_InitStruct.DMA2D_OutputMemoryAdd = CurrentFrameBuffer;
+    DMA2D_InitStruct.DMA2D_OutputOffset = 0;
+    DMA2D_InitStruct.DMA2D_NumberOfLine = LCD_PIXEL_HEIGHT;
+    DMA2D_InitStruct.DMA2D_PixelPerLine = LCD_PIXEL_WIDTH;
+    DMA2D_Init(&DMA2D_InitStruct);
 
- /* Start Transfer */
- DMA2D_StartTransfer();
+    /* Start Transfer */
+    DMA2D_StartTransfer();
 
- /* Wait for CTC Flag activation */
- while(DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
- {
- }
+    /* Wait for CTC Flag activation */
+    while (DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
+    {
+    }
 
- LCD_SetTextColor(CurrentTextColor);
- 
+    LCD_SetTextColor(CurrentTextColor);
 }
 
 /**
@@ -463,7 +454,7 @@ void LCD_Clear(uint16_t Color)
  */
 uint32_t LCD_SetCursor(uint16_t Xpos, uint16_t Ypos)
 {
- return CurrentFrameBuffer + 2*(Xpos + (LCD_PIXEL_WIDTH*Ypos));
+    return CurrentFrameBuffer + 2 * (Xpos + (LCD_PIXEL_WIDTH * Ypos));
 }
 
 /**
@@ -473,25 +464,25 @@ uint32_t LCD_SetCursor(uint16_t Xpos, uint16_t Ypos)
  */
 void LCD_SetColorKeying(uint32_t RGBValue)
 {
- LTDC_ColorKeying_InitTypeDef   LTDC_colorkeying_InitStruct;
+    LTDC_ColorKeying_InitTypeDef LTDC_colorkeying_InitStruct;
 
- /* configure the color Keying */
- LTDC_colorkeying_InitStruct.LTDC_ColorKeyBlue = 0x0000FF & RGBValue;
- LTDC_colorkeying_InitStruct.LTDC_ColorKeyGreen = (0x00FF00 & RGBValue) >> 8;
- LTDC_colorkeying_InitStruct.LTDC_ColorKeyRed = (0xFF0000 & RGBValue) >> 16;
+    /* configure the color Keying */
+    LTDC_colorkeying_InitStruct.LTDC_ColorKeyBlue = 0x0000FF & RGBValue;
+    LTDC_colorkeying_InitStruct.LTDC_ColorKeyGreen = (0x00FF00 & RGBValue) >> 8;
+    LTDC_colorkeying_InitStruct.LTDC_ColorKeyRed = (0xFF0000 & RGBValue) >> 16;
 
- if (CurrentLayer == LCD_BACKGROUND_LAYER)
- {
-   /* Enable the color Keying for Layer1 */
-   LTDC_ColorKeyingConfig(LTDC_Layer1, &LTDC_colorkeying_InitStruct, ENABLE);
-   LTDC_ReloadConfig(LTDC_IMReload);
- }
- else
- {
-   /* Enable the color Keying for Layer2 */
-   LTDC_ColorKeyingConfig(LTDC_Layer2, &LTDC_colorkeying_InitStruct, ENABLE);
-   LTDC_ReloadConfig(LTDC_IMReload);
- }
+    if (CurrentLayer == LCD_BACKGROUND_LAYER)
+    {
+        /* Enable the color Keying for Layer1 */
+        LTDC_ColorKeyingConfig(LTDC_Layer1, &LTDC_colorkeying_InitStruct, ENABLE);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
+    else
+    {
+        /* Enable the color Keying for Layer2 */
+        LTDC_ColorKeyingConfig(LTDC_Layer2, &LTDC_colorkeying_InitStruct, ENABLE);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
 }
 
 /**
@@ -501,20 +492,20 @@ void LCD_SetColorKeying(uint32_t RGBValue)
  */
 void LCD_ReSetColorKeying(void)
 {
- LTDC_ColorKeying_InitTypeDef   LTDC_colorkeying_InitStruct;
+    LTDC_ColorKeying_InitTypeDef LTDC_colorkeying_InitStruct;
 
- if (CurrentLayer == LCD_BACKGROUND_LAYER)
- {
-   /* Disable the color Keying for Layer1 */
-   LTDC_ColorKeyingConfig(LTDC_Layer1, &LTDC_colorkeying_InitStruct, DISABLE);
-   LTDC_ReloadConfig(LTDC_IMReload);
- }
- else
- {
-   /* Disable the color Keying for Layer2 */
-   LTDC_ColorKeyingConfig(LTDC_Layer2, &LTDC_colorkeying_InitStruct, DISABLE);
-   LTDC_ReloadConfig(LTDC_IMReload);
- }
+    if (CurrentLayer == LCD_BACKGROUND_LAYER)
+    {
+        /* Disable the color Keying for Layer1 */
+        LTDC_ColorKeyingConfig(LTDC_Layer1, &LTDC_colorkeying_InitStruct, DISABLE);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
+    else
+    {
+        /* Disable the color Keying for Layer2 */
+        LTDC_ColorKeyingConfig(LTDC_Layer2, &LTDC_colorkeying_InitStruct, DISABLE);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
 }
 
 /**
@@ -526,33 +517,33 @@ void LCD_ReSetColorKeying(void)
  */
 void LCD_DrawChar(uint16_t Xpos, uint16_t Ypos, const uint16_t *c)
 {
- uint32_t index = 0, counter = 0, xpos =0;
- uint32_t  Xaddress = 0;
+    uint32_t index = 0, counter = 0, xpos = 0;
+    uint32_t Xaddress = 0;
 
- xpos = Xpos*LCD_PIXEL_WIDTH*2;
- Xaddress += Ypos;
+    xpos = Xpos * LCD_PIXEL_WIDTH * 2;
+    Xaddress += Ypos;
 
- for(index = 0; index < LCD_Currentfonts->Height; index++)
- {
+    for (index = 0; index < LCD_Currentfonts->Height; index++)
+    {
 
-   for(counter = 0; counter < LCD_Currentfonts->Width; counter++)
-   {
+        for (counter = 0; counter < LCD_Currentfonts->Width; counter++)
+        {
 
-     if((((c[index] & ((0x80 << ((LCD_Currentfonts->Width / 12 ) * 8 ) ) >> counter)) == 0x00) &&(LCD_Currentfonts->Width <= 12))||
-       (((c[index] & (0x1 << counter)) == 0x00)&&(LCD_Currentfonts->Width > 12 )))
-     {
-         /* Write data value to all SDRAM memory */
-        *(__IO uint16_t*) (CurrentFrameBuffer + (2*Xaddress) + xpos) = CurrentBackColor;
-     }
-     else
-     {
-         /* Write data value to all SDRAM memory */
-        *(__IO uint16_t*) (CurrentFrameBuffer + (2*Xaddress) + xpos) = CurrentTextColor;
-     }
-     Xaddress++;
-   }
-     Xaddress += (LCD_PIXEL_WIDTH - LCD_Currentfonts->Width);
- }
+            if ((((c[index] & ((0x80 << ((LCD_Currentfonts->Width / 12) * 8)) >> counter)) == 0x00) && (LCD_Currentfonts->Width <= 12)) ||
+                (((c[index] & (0x1 << counter)) == 0x00) && (LCD_Currentfonts->Width > 12)))
+            {
+                /* Write data value to all SDRAM memory */
+                *(__IO uint16_t *)(CurrentFrameBuffer + (2 * Xaddress) + xpos) = CurrentBackColor;
+            }
+            else
+            {
+                /* Write data value to all SDRAM memory */
+                *(__IO uint16_t *)(CurrentFrameBuffer + (2 * Xaddress) + xpos) = CurrentTextColor;
+            }
+            Xaddress++;
+        }
+        Xaddress += (LCD_PIXEL_WIDTH - LCD_Currentfonts->Width);
+    }
 }
 
 /**
@@ -566,9 +557,9 @@ void LCD_DrawChar(uint16_t Xpos, uint16_t Ypos, const uint16_t *c)
  */
 void LCD_DisplayChar(uint16_t Line, uint16_t Column, uint8_t Ascii)
 {
- Ascii -= 32;
+    Ascii -= 32;
 
- LCD_DrawChar(Line, Column, &LCD_Currentfonts->table[Ascii * LCD_Currentfonts->Height]);
+    LCD_DrawChar(Line, Column, &LCD_Currentfonts->table[Ascii * LCD_Currentfonts->Height]);
 }
 
 /**
@@ -581,21 +572,18 @@ void LCD_DisplayChar(uint16_t Line, uint16_t Column, uint8_t Ascii)
  */
 void LCD_DisplayStringLine(uint16_t Line, uint8_t *ptr)
 {
- uint16_t refcolumn = 0;
- /* Send the string character by character on lCD */
- while ((refcolumn < LCD_PIXEL_WIDTH) && ((*ptr != 0) & (((refcolumn + LCD_Currentfonts->Width) & 0xFFFF) >= LCD_Currentfonts->Width)))
- {
-   /* Display one character on LCD */
-   LCD_DisplayChar(Line, refcolumn, *ptr);
-   /* Decrement the column position by width */
-   refcolumn += LCD_Currentfonts->Width;
-   /* Point on the next character */
-   ptr++;
- }
+    uint16_t refcolumn = 0;
+    /* Send the string character by character on lCD */
+    while ((refcolumn < LCD_PIXEL_WIDTH) && ((*ptr != 0) & (((refcolumn + LCD_Currentfonts->Width) & 0xFFFF) >= LCD_Currentfonts->Width)))
+    {
+        /* Display one character on LCD */
+        LCD_DisplayChar(Line, refcolumn, *ptr);
+        /* Decrement the column position by width */
+        refcolumn += LCD_Currentfonts->Width;
+        /* Point on the next character */
+        ptr++;
+    }
 }
-
-
-
 
 /**
  * @brief  在显示器上显示一个中文字符
@@ -603,176 +591,161 @@ void LCD_DisplayStringLine(uint16_t Line, uint8_t *ptr)
  * @param  usY ：在特定扫描方向下字符的起始Y坐标
  * @param  usChar ：要显示的中文字符（国标码）
  * @retval 无
- */ 
-void LCD_DispChar_CH ( uint16_t usX, uint16_t usY, uint16_t usChar)
+ */
+void LCD_DispChar_CH(uint16_t usX, uint16_t usY, uint16_t usChar)
 {
-	uint8_t ucPage, ucColumn;
-	uint8_t ucBuffer [ 24*24/8 ];	
+    uint8_t ucPage, ucColumn;
+    uint8_t ucBuffer[24 * 24 / 8];
 
-  uint32_t usTemp; 	
-	
-	
-	uint32_t  xpos =0;
-  uint32_t  Xaddress = 0;
-  
-	/*xpos表示当前行的显存偏移位置*/
-  xpos = usX*LCD_PIXEL_WIDTH*2;
-	
-	/*Xaddress表示像素点*/
-  Xaddress += usY;
-	   
-  macGetGBKCode ( ucBuffer, usChar );	//取字模数据
-	
-	/*ucPage表示当前行数*/
-	for ( ucPage = 0; ucPage < macHEIGHT_CH_CHAR; ucPage ++ )
-	{
-    /* 取出3个字节的数据，在lcd上即是一个汉字的一行 */
-		usTemp = ucBuffer [ ucPage * 3 ];
-		usTemp = ( usTemp << 8 );
-		usTemp |= ucBuffer [ ucPage * 3 + 1 ];
-		usTemp = ( usTemp << 8 );
-		usTemp |= ucBuffer [ ucPage * 3 + 2];
-	
-		
-		for ( ucColumn = 0; ucColumn < macWIDTH_CH_CHAR; ucColumn ++ ) 
-		{			
-			if ( usTemp & ( 0x01 << 23 ) )  //高位在前 				
-			{
-				//字体色
-        /* Write data value to all SDRAM memory */
-        *(__IO uint16_t*) (CurrentFrameBuffer + (2*Xaddress) + xpos) = CurrentTextColor;
+    uint32_t usTemp;
 
-			}				
-			else	
-			{
-				//背景色
-         /* Write data value to all SDRAM memory */
-        *(__IO uint16_t*) (CurrentFrameBuffer + (2*Xaddress) + xpos) = CurrentBackColor;
-			}	
-			/*指向当前行的下一个点*/	
-			Xaddress++;			
-			usTemp <<= 1;
-			
-		}
-		/*显示完一行*/
-		/*指向字符显示矩阵下一行的第一个像素点*/
-		Xaddress += (LCD_PIXEL_WIDTH - macWIDTH_CH_CHAR);
-		
-	}
+    uint32_t xpos = 0;
+    uint32_t Xaddress = 0;
+
+    /*xpos表示当前行的显存偏移位置*/
+    xpos = usX * LCD_PIXEL_WIDTH * 2;
+
+    /*Xaddress表示像素点*/
+    Xaddress += usY;
+
+    macGetGBKCode(ucBuffer, usChar); // 取字模数据
+
+    /*ucPage表示当前行数*/
+    for (ucPage = 0; ucPage < macHEIGHT_CH_CHAR; ucPage++)
+    {
+        /* 取出3个字节的数据，在lcd上即是一个汉字的一行 */
+        usTemp = ucBuffer[ucPage * 3];
+        usTemp = (usTemp << 8);
+        usTemp |= ucBuffer[ucPage * 3 + 1];
+        usTemp = (usTemp << 8);
+        usTemp |= ucBuffer[ucPage * 3 + 2];
+
+        for (ucColumn = 0; ucColumn < macWIDTH_CH_CHAR; ucColumn++)
+        {
+            if (usTemp & (0x01 << 23)) // 高位在前
+            {
+                // 字体色
+                /* Write data value to all SDRAM memory */
+                *(__IO uint16_t *)(CurrentFrameBuffer + (2 * Xaddress) + xpos) = CurrentTextColor;
+            }
+            else
+            {
+                // 背景色
+                /* Write data value to all SDRAM memory */
+                *(__IO uint16_t *)(CurrentFrameBuffer + (2 * Xaddress) + xpos) = CurrentBackColor;
+            }
+            /*指向当前行的下一个点*/
+            Xaddress++;
+            usTemp <<= 1;
+        }
+        /*显示完一行*/
+        /*指向字符显示矩阵下一行的第一个像素点*/
+        Xaddress += (LCD_PIXEL_WIDTH - macWIDTH_CH_CHAR);
+    }
 }
-
 
 /**
  * @brief  在显示器上显示中英文字符串,超出液晶宽度时会自动换行。
-					 中英文混显示时，请把英文字体设置为Font16x24格式
+                     中英文混显示时，请把英文字体设置为Font16x24格式
  * @param  Line ：行(也可理解为y坐标)
  * @param  Column ：列（也可理解为x坐标）
  * @param  pStr ：要显示的字符串的首地址
  * @retval 无
  */
-void LCD_DispString_EN_CH( uint16_t Line, uint16_t Column, const uint8_t * pStr )
+void LCD_DispString_EN_CH(uint16_t Line, uint16_t Column, const uint8_t *pStr)
 {
-	uint16_t usCh;
-	
-	
-	while( * pStr != '\0' )
-	{
-		if ( * pStr <= 126 )	           	//英文字符
-		{
-	
-			/*自动换行*/
-			if ( ( Column + LCD_Currentfonts->Width ) > LCD_PIXEL_WIDTH )
-			{
-				Column = 0;
-				Line += LCD_Currentfonts->Height;
-			}
-			
-			if ( ( Line + LCD_Currentfonts->Height ) > LCD_PIXEL_HEIGHT )
-			{
-				Column = 0;
-				Line = 0;
-			}			
-					
-			LCD_DisplayChar(Line,Column,*pStr);
-			
-			Column += LCD_Currentfonts->Width;
-		
-		  pStr ++;
+    uint16_t usCh;
 
-		}
-		
-		else	                            //汉字字符
-		{
-			if ( ( Column + macWIDTH_CH_CHAR ) > LCD_PIXEL_WIDTH )
-			{
-				Column = 0;
-				Line += macHEIGHT_CH_CHAR;
-			}
-			
-			if ( ( Line + macHEIGHT_CH_CHAR ) > LCD_PIXEL_HEIGHT )
-			{
-				Column = 0;
-				Line = 0;
-			}	
-			
-			/*一个汉字两字节*/
-			usCh = * ( uint16_t * ) pStr;				
-			usCh = ( usCh << 8 ) + ( usCh >> 8 );		
+    while (*pStr != '\0')
+    {
+        if (*pStr <= 126) // 英文字符
+        {
 
-			LCD_DispChar_CH (Line,Column, usCh);
-			
-			Column += macWIDTH_CH_CHAR;
-			
-			pStr += 2;           //一个汉字两个字节 
-		
+            /*自动换行*/
+            if ((Column + LCD_Currentfonts->Width) > LCD_PIXEL_WIDTH)
+            {
+                Column = 0;
+                Line += LCD_Currentfonts->Height;
+            }
+
+            if ((Line + LCD_Currentfonts->Height) > LCD_PIXEL_HEIGHT)
+            {
+                Column = 0;
+                Line = 0;
+            }
+
+            LCD_DisplayChar(Line, Column, *pStr);
+
+            Column += LCD_Currentfonts->Width;
+
+            pStr++;
+        }
+
+        else // 汉字字符
+        {
+            if ((Column + macWIDTH_CH_CHAR) > LCD_PIXEL_WIDTH)
+            {
+                Column = 0;
+                Line += macHEIGHT_CH_CHAR;
+            }
+
+            if ((Line + macHEIGHT_CH_CHAR) > LCD_PIXEL_HEIGHT)
+            {
+                Column = 0;
+                Line = 0;
+            }
+
+            /*一个汉字两字节*/
+            usCh = *(uint16_t *)pStr;
+            usCh = (usCh << 8) + (usCh >> 8);
+
+            LCD_DispChar_CH(Line, Column, usCh);
+
+            Column += macWIDTH_CH_CHAR;
+
+            pStr += 2; // 一个汉字两个字节
+        }
     }
-		
-  }
-	
-	
-} 
+}
 
 /**
   * @brief  显示一行字符，若超出液晶宽度，不自动换行。
-						中英混显时，请把英文字体设置为Font16x24格式
+                        中英混显时，请把英文字体设置为Font16x24格式
   * @param  Line: 要显示的行编号LINE(0) - LINE(N)
   * @param  *ptr: 要显示的字符串指针
   * @retval None
   */
 void LCD_DisplayStringLine_EN_CH(uint16_t Line, uint8_t *ptr)
-{  
-  uint16_t refcolumn = 0;
-  /* Send the string character by character on lCD */
-  while ((refcolumn < LCD_PIXEL_WIDTH) && ((*ptr != 0) & (((refcolumn + LCD_Currentfonts->Width) & 0xFFFF) >= LCD_Currentfonts->Width)))
-  {
-    /* Display one character on LCD */
-		if ( * ptr <= 126 )	           	//英文字符
-		{
-					
-			LCD_DisplayChar(Line, refcolumn, *ptr);
-			/* Decrement the column position by width */
-			refcolumn += LCD_Currentfonts->Width;
-			/* Point on the next character */
-			ptr++;
-		}
-		
-		else	                            //汉字字符
-		{	
-			uint16_t usCh;
-			
-			/*一个汉字两字节*/
-			usCh = * ( uint16_t * ) ptr;				
-			usCh = ( usCh << 8 ) + ( usCh >> 8 );		
-			
-			LCD_DispChar_CH ( Line, refcolumn, usCh );
-			refcolumn += macWIDTH_CH_CHAR;
+{
+    uint16_t refcolumn = 0;
+    /* Send the string character by character on lCD */
+    while ((refcolumn < LCD_PIXEL_WIDTH) && ((*ptr != 0) & (((refcolumn + LCD_Currentfonts->Width) & 0xFFFF) >= LCD_Currentfonts->Width)))
+    {
+        /* Display one character on LCD */
+        if (*ptr <= 126) // 英文字符
+        {
 
-			ptr += 2; 		
-    }		
+            LCD_DisplayChar(Line, refcolumn, *ptr);
+            /* Decrement the column position by width */
+            refcolumn += LCD_Currentfonts->Width;
+            /* Point on the next character */
+            ptr++;
+        }
 
-		
+        else // 汉字字符
+        {
+            uint16_t usCh;
 
-  }
+            /*一个汉字两字节*/
+            usCh = *(uint16_t *)ptr;
+            usCh = (usCh << 8) + (usCh >> 8);
+
+            LCD_DispChar_CH(Line, refcolumn, usCh);
+            refcolumn += macWIDTH_CH_CHAR;
+
+            ptr += 2;
+        }
+    }
 }
 
 /**
@@ -786,26 +759,26 @@ void LCD_DisplayStringLine_EN_CH(uint16_t Line, uint8_t *ptr)
 void LCD_SetDisplayWindow(uint16_t Xpos, uint16_t Ypos, uint16_t Height, uint16_t Width)
 {
 
- if (CurrentLayer == LCD_BACKGROUND_LAYER)
- {
-   /* reconfigure the layer1 position */
-   LTDC_LayerPosition(LTDC_Layer1, Xpos, Ypos);
-   LTDC_ReloadConfig(LTDC_IMReload);
+    if (CurrentLayer == LCD_BACKGROUND_LAYER)
+    {
+        /* reconfigure the layer1 position */
+        LTDC_LayerPosition(LTDC_Layer1, Xpos, Ypos);
+        LTDC_ReloadConfig(LTDC_IMReload);
 
-   /* reconfigure the layer1 size */
-   LTDC_LayerSize(LTDC_Layer1, Width, Height);
-   LTDC_ReloadConfig(LTDC_IMReload);
-}
-else
-{
-   /* reconfigure the layer2 position */
-   LTDC_LayerPosition(LTDC_Layer2, Xpos, Ypos);
-   LTDC_ReloadConfig(LTDC_IMReload);
+        /* reconfigure the layer1 size */
+        LTDC_LayerSize(LTDC_Layer1, Width, Height);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
+    else
+    {
+        /* reconfigure the layer2 position */
+        LTDC_LayerPosition(LTDC_Layer2, Xpos, Ypos);
+        LTDC_ReloadConfig(LTDC_IMReload);
 
-  /* reconfigure the layer2 size */
-   LTDC_LayerSize(LTDC_Layer2, Width, Height);
-   LTDC_ReloadConfig(LTDC_IMReload);
- }
+        /* reconfigure the layer2 size */
+        LTDC_LayerSize(LTDC_Layer2, Width, Height);
+        LTDC_ReloadConfig(LTDC_IMReload);
+    }
 }
 
 /**
@@ -815,7 +788,7 @@ else
  */
 void LCD_WindowModeDisable(void)
 {
- LCD_SetDisplayWindow(0, 0, LCD_PIXEL_HEIGHT, LCD_PIXEL_WIDTH);
+    LCD_SetDisplayWindow(0, 0, LCD_PIXEL_HEIGHT, LCD_PIXEL_WIDTH);
 }
 
 /**
@@ -829,48 +802,47 @@ void LCD_WindowModeDisable(void)
  */
 void LCD_DrawLine(uint16_t Xpos, uint16_t Ypos, uint16_t Length, uint8_t Direction)
 {
- DMA2D_InitTypeDef      DMA2D_InitStruct;
+    DMA2D_InitTypeDef DMA2D_InitStruct;
 
- uint32_t  Xaddress = 0;
- uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
+    uint32_t Xaddress = 0;
+    uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
 
- Xaddress = CurrentFrameBuffer + 2*(LCD_PIXEL_WIDTH*Ypos + Xpos);
+    Xaddress = CurrentFrameBuffer + 2 * (LCD_PIXEL_WIDTH * Ypos + Xpos);
 
- Red_Value = (0xF800 & CurrentTextColor) >> 11;
- Blue_Value = 0x001F & CurrentTextColor;
- Green_Value = (0x07E0 & CurrentTextColor) >> 5;
+    Red_Value = (0xF800 & CurrentTextColor) >> 11;
+    Blue_Value = 0x001F & CurrentTextColor;
+    Green_Value = (0x07E0 & CurrentTextColor) >> 5;
 
- /* Configure DMA2D */
- DMA2D_DeInit();
- DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
- DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
- DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
- DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
- DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
- DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
- DMA2D_InitStruct.DMA2D_OutputMemoryAdd = Xaddress;
+    /* Configure DMA2D */
+    DMA2D_DeInit();
+    DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
+    DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
+    DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
+    DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
+    DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
+    DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
+    DMA2D_InitStruct.DMA2D_OutputMemoryAdd = Xaddress;
 
- if(Direction == LCD_DIR_HORIZONTAL)
- {
-   DMA2D_InitStruct.DMA2D_OutputOffset = 0;
-   DMA2D_InitStruct.DMA2D_NumberOfLine = 1;
-   DMA2D_InitStruct.DMA2D_PixelPerLine = Length;
- }
- else
- {
-   DMA2D_InitStruct.DMA2D_OutputOffset = LCD_PIXEL_WIDTH - 1;
-   DMA2D_InitStruct.DMA2D_NumberOfLine = Length;
-   DMA2D_InitStruct.DMA2D_PixelPerLine = 1;
- }
+    if (Direction == LCD_DIR_HORIZONTAL)
+    {
+        DMA2D_InitStruct.DMA2D_OutputOffset = 0;
+        DMA2D_InitStruct.DMA2D_NumberOfLine = 1;
+        DMA2D_InitStruct.DMA2D_PixelPerLine = Length;
+    }
+    else
+    {
+        DMA2D_InitStruct.DMA2D_OutputOffset = LCD_PIXEL_WIDTH - 1;
+        DMA2D_InitStruct.DMA2D_NumberOfLine = Length;
+        DMA2D_InitStruct.DMA2D_PixelPerLine = 1;
+    }
 
- DMA2D_Init(&DMA2D_InitStruct);
- /* Start Transfer */
- DMA2D_StartTransfer();
- /* Wait for CTC Flag activation */
- while(DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
- {
- }
-
+    DMA2D_Init(&DMA2D_InitStruct);
+    /* Start Transfer */
+    DMA2D_StartTransfer();
+    /* Wait for CTC Flag activation */
+    while (DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
+    {
+    }
 }
 
 /**
@@ -883,13 +855,13 @@ void LCD_DrawLine(uint16_t Xpos, uint16_t Ypos, uint16_t Length, uint8_t Directi
  */
 void LCD_DrawRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
 {
- /* draw horizontal lines */
- LCD_DrawLine(Xpos, Ypos, Width, LCD_DIR_HORIZONTAL);
- LCD_DrawLine(Xpos, (Ypos+ Height), Width, LCD_DIR_HORIZONTAL);
+    /* draw horizontal lines */
+    LCD_DrawLine(Xpos, Ypos, Width, LCD_DIR_HORIZONTAL);
+    LCD_DrawLine(Xpos, (Ypos + Height), Width, LCD_DIR_HORIZONTAL);
 
- /* draw vertical lines */
- LCD_DrawLine(Xpos, Ypos, Height, LCD_DIR_VERTICAL);
- LCD_DrawLine((Xpos + Width), Ypos, Height, LCD_DIR_VERTICAL);
+    /* draw vertical lines */
+    LCD_DrawLine(Xpos, Ypos, Height, LCD_DIR_VERTICAL);
+    LCD_DrawLine((Xpos + Width), Ypos, Height, LCD_DIR_VERTICAL);
 }
 
 /**
@@ -901,21 +873,24 @@ void LCD_DrawRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
  */
 void LCD_DrawCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
 {
-   int x = -Radius, y = 0, err = 2-2*Radius, e2;
-   do {
-       *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-x) + LCD_PIXEL_WIDTH*(Ypos+y)))) = CurrentTextColor;
-       *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+x) + LCD_PIXEL_WIDTH*(Ypos+y)))) = CurrentTextColor;
-       *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+x) + LCD_PIXEL_WIDTH*(Ypos-y)))) = CurrentTextColor;
-       *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-x) + LCD_PIXEL_WIDTH*(Ypos-y)))) = CurrentTextColor;
+    int x = -Radius, y = 0, err = 2 - 2 * Radius, e2;
+    do
+    {
+        *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - x) + LCD_PIXEL_WIDTH * (Ypos + y)))) = CurrentTextColor;
+        *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + x) + LCD_PIXEL_WIDTH * (Ypos + y)))) = CurrentTextColor;
+        *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + x) + LCD_PIXEL_WIDTH * (Ypos - y)))) = CurrentTextColor;
+        *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - x) + LCD_PIXEL_WIDTH * (Ypos - y)))) = CurrentTextColor;
 
-       e2 = err;
-       if (e2 <= y) {
-           err += ++y*2+1;
-           if (-x == y && e2 <= x) e2 = 0;
-       }
-       if (e2 > x) err += ++x*2+1;
-   }
-   while (x <= 0);
+        e2 = err;
+        if (e2 <= y)
+        {
+            err += ++y * 2 + 1;
+            if (-x == y && e2 <= x)
+                e2 = 0;
+        }
+        if (e2 > x)
+            err += ++x * 2 + 1;
+    } while (x <= 0);
 }
 
 /**
@@ -928,51 +903,53 @@ void LCD_DrawCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
  */
 void LCD_DrawFullEllipse(int Xpos, int Ypos, int Radius, int Radius2)
 {
- int x = -Radius, y = 0, err = 2-2*Radius, e2;
- float K = 0, rad1 = 0, rad2 = 0;
+    int x = -Radius, y = 0, err = 2 - 2 * Radius, e2;
+    float K = 0, rad1 = 0, rad2 = 0;
 
- rad1 = Radius;
- rad2 = Radius2;
+    rad1 = Radius;
+    rad2 = Radius2;
 
- if (Radius > Radius2)
- {
-   do
-   {
-     K = (float)(rad1/rad2);
-     LCD_DrawLine((Xpos+x), (Ypos-(uint16_t)(y/K)), (2*(uint16_t)(y/K) + 1), LCD_DIR_VERTICAL);
-     LCD_DrawLine((Xpos-x), (Ypos-(uint16_t)(y/K)), (2*(uint16_t)(y/K) + 1), LCD_DIR_VERTICAL);
+    if (Radius > Radius2)
+    {
+        do
+        {
+            K = (float)(rad1 / rad2);
+            LCD_DrawLine((Xpos + x), (Ypos - (uint16_t)(y / K)), (2 * (uint16_t)(y / K) + 1), LCD_DIR_VERTICAL);
+            LCD_DrawLine((Xpos - x), (Ypos - (uint16_t)(y / K)), (2 * (uint16_t)(y / K) + 1), LCD_DIR_VERTICAL);
 
-     e2 = err;
-     if (e2 <= y)
-     {
-       err += ++y*2+1;
-       if (-x == y && e2 <= x) e2 = 0;
-     }
-     if (e2 > x) err += ++x*2+1;
+            e2 = err;
+            if (e2 <= y)
+            {
+                err += ++y * 2 + 1;
+                if (-x == y && e2 <= x)
+                    e2 = 0;
+            }
+            if (e2 > x)
+                err += ++x * 2 + 1;
 
-   }
-   while (x <= 0);
- }
- else
- {
-   y = -Radius2;
-   x = 0;
-   do
-   {
-     K = (float)(rad2/rad1);
-     LCD_DrawLine((Xpos-(uint16_t)(x/K)), (Ypos+y), (2*(uint16_t)(x/K) + 1), LCD_DIR_HORIZONTAL);
-     LCD_DrawLine((Xpos-(uint16_t)(x/K)), (Ypos-y), (2*(uint16_t)(x/K) + 1), LCD_DIR_HORIZONTAL);
+        } while (x <= 0);
+    }
+    else
+    {
+        y = -Radius2;
+        x = 0;
+        do
+        {
+            K = (float)(rad2 / rad1);
+            LCD_DrawLine((Xpos - (uint16_t)(x / K)), (Ypos + y), (2 * (uint16_t)(x / K) + 1), LCD_DIR_HORIZONTAL);
+            LCD_DrawLine((Xpos - (uint16_t)(x / K)), (Ypos - y), (2 * (uint16_t)(x / K) + 1), LCD_DIR_HORIZONTAL);
 
-     e2 = err;
-     if (e2 <= x)
-     {
-       err += ++x*2+1;
-       if (-y == x && e2 <= y) e2 = 0;
-     }
-     if (e2 > y) err += ++y*2+1;
-   }
-   while (y <= 0);
- }
+            e2 = err;
+            if (e2 <= x)
+            {
+                err += ++x * 2 + 1;
+                if (-y == x && e2 <= y)
+                    e2 = 0;
+            }
+            if (e2 > y)
+                err += ++y * 2 + 1;
+        } while (y <= 0);
+    }
 }
 
 /**
@@ -985,50 +962,56 @@ void LCD_DrawFullEllipse(int Xpos, int Ypos, int Radius, int Radius2)
  */
 void LCD_DrawEllipse(int Xpos, int Ypos, int Radius, int Radius2)
 {
- int x = -Radius, y = 0, err = 2-2*Radius, e2;
- float K = 0, rad1 = 0, rad2 = 0;
+    int x = -Radius, y = 0, err = 2 - 2 * Radius, e2;
+    float K = 0, rad1 = 0, rad2 = 0;
 
- rad1 = Radius;
- rad2 = Radius2;
+    rad1 = Radius;
+    rad2 = Radius2;
 
- if (Radius > Radius2)
- {
-   do {
-     K = (float)(rad1/rad2);
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-x) + LCD_PIXEL_WIDTH*(Ypos+(uint16_t)(y/K))))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+x) + LCD_PIXEL_WIDTH*(Ypos+(uint16_t)(y/K))))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+x) + LCD_PIXEL_WIDTH*(Ypos-(uint16_t)(y/K))))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-x) + LCD_PIXEL_WIDTH*(Ypos-(uint16_t)(y/K))))) = CurrentTextColor;
+    if (Radius > Radius2)
+    {
+        do
+        {
+            K = (float)(rad1 / rad2);
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - x) + LCD_PIXEL_WIDTH * (Ypos + (uint16_t)(y / K))))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + x) + LCD_PIXEL_WIDTH * (Ypos + (uint16_t)(y / K))))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + x) + LCD_PIXEL_WIDTH * (Ypos - (uint16_t)(y / K))))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - x) + LCD_PIXEL_WIDTH * (Ypos - (uint16_t)(y / K))))) = CurrentTextColor;
 
-     e2 = err;
-     if (e2 <= y) {
-       err += ++y*2+1;
-       if (-x == y && e2 <= x) e2 = 0;
-     }
-     if (e2 > x) err += ++x*2+1;
-   }
-   while (x <= 0);
- }
- else
- {
-   y = -Radius2;
-   x = 0;
-   do {
-     K = (float)(rad2/rad1);
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-(uint16_t)(x/K)) + LCD_PIXEL_WIDTH*(Ypos+y)))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+(uint16_t)(x/K)) + LCD_PIXEL_WIDTH*(Ypos+y)))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos+(uint16_t)(x/K)) + LCD_PIXEL_WIDTH*(Ypos-y)))) = CurrentTextColor;
-     *(__IO uint16_t*) (CurrentFrameBuffer + (2*((Xpos-(uint16_t)(x/K)) + LCD_PIXEL_WIDTH*(Ypos-y)))) = CurrentTextColor;
+            e2 = err;
+            if (e2 <= y)
+            {
+                err += ++y * 2 + 1;
+                if (-x == y && e2 <= x)
+                    e2 = 0;
+            }
+            if (e2 > x)
+                err += ++x * 2 + 1;
+        } while (x <= 0);
+    }
+    else
+    {
+        y = -Radius2;
+        x = 0;
+        do
+        {
+            K = (float)(rad2 / rad1);
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - (uint16_t)(x / K)) + LCD_PIXEL_WIDTH * (Ypos + y)))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + (uint16_t)(x / K)) + LCD_PIXEL_WIDTH * (Ypos + y)))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos + (uint16_t)(x / K)) + LCD_PIXEL_WIDTH * (Ypos - y)))) = CurrentTextColor;
+            *(__IO uint16_t *)(CurrentFrameBuffer + (2 * ((Xpos - (uint16_t)(x / K)) + LCD_PIXEL_WIDTH * (Ypos - y)))) = CurrentTextColor;
 
-     e2 = err;
-     if (e2 <= x) {
-       err += ++x*2+1;
-       if (-y == x && e2 <= y) e2 = 0;
-     }
-     if (e2 > y) err += ++y*2+1;
-   }
-   while (y <= 0);
- }
+            e2 = err;
+            if (e2 <= x)
+            {
+                err += ++x * 2 + 1;
+                if (-y == x && e2 <= y)
+                    e2 = 0;
+            }
+            if (e2 > y)
+                err += ++y * 2 + 1;
+        } while (y <= 0);
+    }
 }
 
 /**
@@ -1038,23 +1021,22 @@ void LCD_DrawEllipse(int Xpos, int Ypos, int Radius, int Radius2)
  */
 void LCD_DrawMonoPict(const uint32_t *Pict)
 {
- uint32_t index = 0, counter = 0;
+    uint32_t index = 0, counter = 0;
 
-
- for(index = 0; index < 2400; index++)
- {
-   for(counter = 0; counter < 32; counter++)
-   {
-     if((Pict[index] & (1 << counter)) == 0x00)
-     {
-       *(__IO uint16_t*)(CurrentFrameBuffer) = CurrentBackColor;
-     }
-     else
-     {
-       *(__IO uint16_t*)(CurrentFrameBuffer) = CurrentTextColor;
-     }
-   }
- }
+    for (index = 0; index < 2400; index++)
+    {
+        for (counter = 0; counter < 32; counter++)
+        {
+            if ((Pict[index] & (1 << counter)) == 0x00)
+            {
+                *(__IO uint16_t *)(CurrentFrameBuffer) = CurrentBackColor;
+            }
+            else
+            {
+                *(__IO uint16_t *)(CurrentFrameBuffer) = CurrentTextColor;
+            }
+        }
+    }
 }
 
 /**
@@ -1064,132 +1046,132 @@ void LCD_DrawMonoPict(const uint32_t *Pict)
  */
 void LCD_WriteBMP(uint32_t BmpAddress)
 {
- uint32_t bisize=0,index = 0, size = 0, width = 0, height = 0, bit_pixel = 0,picsize=0;
- uint32_t Address;
- uint32_t currentline = 0, linenumber = 0;
- uint16_t data=0;
- 
- Address = CurrentFrameBuffer;
+    uint32_t bisize = 0, index = 0, size = 0, width = 0, height = 0, bit_pixel = 0, picsize = 0;
+    uint32_t Address;
+    uint32_t currentline = 0, linenumber = 0;
+    uint16_t data = 0;
 
- /* Read bitmap size */
- size = *(__IO uint16_t *) (BmpAddress + 2);
- size |= (*(__IO uint16_t *) (BmpAddress + 4)) << 16;	
- printf("bmp->size: %d\n",size);
-	
- data= *(__IO uint16_t *) (BmpAddress + size-2);
-	printf("bmp->data: %04X\n",data);
-	
- /* Get bitmap data address offset */
- index = *(__IO uint16_t *) (BmpAddress + 10);
- index |= (*(__IO uint16_t *) (BmpAddress + 12)) << 16;
- printf("bmp->index: %d\n",index);
-	
- /* Read bisize */
- bisize = *(uint16_t *) (BmpAddress + 14);
- bisize |= (*(uint16_t *) (BmpAddress + 16)) << 16;
- printf("bmp->bisize: %d\n",bisize);
-	
- /* Read bitmap width */
- width = *(uint16_t *) (BmpAddress + 18);
- width |= (*(uint16_t *) (BmpAddress + 20)) << 16;
- printf("bmp->width: %d\n",width);
-	
- /* Read bitmap height */
- height = *(uint16_t *) (BmpAddress + 22);
- height |= (*(uint16_t *) (BmpAddress + 24)) << 16;
- printf("bmp->height: %d\n",height);
- 
- /* Read bit/pixel */
- bit_pixel = *(uint16_t *) (BmpAddress + 28);
- printf("bmp->bit_pixel: %d\n",bit_pixel);
- 
- /* Read bitmap height */
- picsize = *(uint16_t *) (BmpAddress + 34);
- picsize |= (*(uint16_t *) (BmpAddress + 36)) << 16;
- printf("bmp->picsize: %d\n",picsize);
- 
- if (CurrentLayer == LCD_BACKGROUND_LAYER)
- {
-   /* reconfigure layer size in accordance with the picture */
-   LTDC_LayerSize(LTDC_Layer1, width, height);
-   LTDC_ReloadConfig(LTDC_VBReload);
+    Address = CurrentFrameBuffer;
 
-   /* Reconfigure the Layer pixel format in accordance with the picture */
-   if ((bit_pixel/8) == 4)
-   {
-     LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_ARGB8888);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
-   else if ((bit_pixel/8) == 2)
-   {
-	 if((bisize==56)&& (data==0))
-	   LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_RGB565);
-	 else
-       LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_ARGB1555);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
-   else
-   {
-     LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_RGB888);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
- }
- else
- {
-   /* reconfigure layer size in accordance with the picture */
-   LTDC_LayerSize(LTDC_Layer2, width, height);
-   LTDC_ReloadConfig(LTDC_VBReload);
+    /* Read bitmap size */
+    size = *(__IO uint16_t *)(BmpAddress + 2);
+    size |= (*(__IO uint16_t *)(BmpAddress + 4)) << 16;
+    printf("bmp->size: %d\n", size);
 
-   /* Reconfigure the Layer pixel format in accordance with the picture */
-   if ((bit_pixel/8) == 4)
-   {
-     LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_ARGB8888);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
-   else if ((bit_pixel/8) == 2)
-   {
-     if((bisize==56)&& (data==0))
-		LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_RGB565);
-	  else
-        LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_ARGB1555);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
-   else
-   {
-     LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_RGB888);
-     LTDC_ReloadConfig(LTDC_VBReload);
-   }
- }
- /* compute the real size of the picture (without the header)) */
- if(picsize && (data==0))
-	size = (size - index-2);
- else
-	 size = (size - index);
+    data = *(__IO uint16_t *)(BmpAddress + size - 2);
+    printf("bmp->data: %04X\n", data);
 
- /* bypass the bitmap header */
- BmpAddress += index;
+    /* Get bitmap data address offset */
+    index = *(__IO uint16_t *)(BmpAddress + 10);
+    index |= (*(__IO uint16_t *)(BmpAddress + 12)) << 16;
+    printf("bmp->index: %d\n", index);
 
- /* start copie image from the bottom */
- Address += width*(height-1)*(bit_pixel/8);
+    /* Read bisize */
+    bisize = *(uint16_t *)(BmpAddress + 14);
+    bisize |= (*(uint16_t *)(BmpAddress + 16)) << 16;
+    printf("bmp->bisize: %d\n", bisize);
 
- for(index = 0; index < size; index++)
- {
-   *(__IO uint8_t*) (Address) = *(__IO uint8_t *)BmpAddress;
-   /*jump on next byte */
-   BmpAddress++;
-   Address++;
-   currentline++;
+    /* Read bitmap width */
+    width = *(uint16_t *)(BmpAddress + 18);
+    width |= (*(uint16_t *)(BmpAddress + 20)) << 16;
+    printf("bmp->width: %d\n", width);
 
-   if((currentline/(bit_pixel/8)) == width)
-   {
-     if(linenumber < height)
-     {
-       linenumber++;
-       Address -=(2*width*(bit_pixel/8));
-       currentline = 0;
-     }
-   }
- }
+    /* Read bitmap height */
+    height = *(uint16_t *)(BmpAddress + 22);
+    height |= (*(uint16_t *)(BmpAddress + 24)) << 16;
+    printf("bmp->height: %d\n", height);
+
+    /* Read bit/pixel */
+    bit_pixel = *(uint16_t *)(BmpAddress + 28);
+    printf("bmp->bit_pixel: %d\n", bit_pixel);
+
+    /* Read bitmap height */
+    picsize = *(uint16_t *)(BmpAddress + 34);
+    picsize |= (*(uint16_t *)(BmpAddress + 36)) << 16;
+    printf("bmp->picsize: %d\n", picsize);
+
+    if (CurrentLayer == LCD_BACKGROUND_LAYER)
+    {
+        /* reconfigure layer size in accordance with the picture */
+        LTDC_LayerSize(LTDC_Layer1, width, height);
+        LTDC_ReloadConfig(LTDC_VBReload);
+
+        /* Reconfigure the Layer pixel format in accordance with the picture */
+        if ((bit_pixel / 8) == 4)
+        {
+            LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_ARGB8888);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+        else if ((bit_pixel / 8) == 2)
+        {
+            if ((bisize == 56) && (data == 0))
+                LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_RGB565);
+            else
+                LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_ARGB1555);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+        else
+        {
+            LTDC_LayerPixelFormat(LTDC_Layer1, LTDC_Pixelformat_RGB888);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+    }
+    else
+    {
+        /* reconfigure layer size in accordance with the picture */
+        LTDC_LayerSize(LTDC_Layer2, width, height);
+        LTDC_ReloadConfig(LTDC_VBReload);
+
+        /* Reconfigure the Layer pixel format in accordance with the picture */
+        if ((bit_pixel / 8) == 4)
+        {
+            LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_ARGB8888);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+        else if ((bit_pixel / 8) == 2)
+        {
+            if ((bisize == 56) && (data == 0))
+                LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_RGB565);
+            else
+                LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_ARGB1555);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+        else
+        {
+            LTDC_LayerPixelFormat(LTDC_Layer2, LTDC_Pixelformat_RGB888);
+            LTDC_ReloadConfig(LTDC_VBReload);
+        }
+    }
+    /* compute the real size of the picture (without the header)) */
+    if (picsize && (data == 0))
+        size = (size - index - 2);
+    else
+        size = (size - index);
+
+    /* bypass the bitmap header */
+    BmpAddress += index;
+
+    /* start copie image from the bottom */
+    Address += width * (height - 1) * (bit_pixel / 8);
+
+    for (index = 0; index < size; index++)
+    {
+        *(__IO uint8_t *)(Address) = *(__IO uint8_t *)BmpAddress;
+        /*jump on next byte */
+        BmpAddress++;
+        Address++;
+        currentline++;
+
+        if ((currentline / (bit_pixel / 8)) == width)
+        {
+            if (linenumber < height)
+            {
+                linenumber++;
+                Address -= (2 * width * (bit_pixel / 8));
+                currentline = 0;
+            }
+        }
+    }
 }
 
 /**
@@ -1202,40 +1184,40 @@ void LCD_WriteBMP(uint32_t BmpAddress)
  */
 void LCD_DrawFullRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Height)
 {
- DMA2D_InitTypeDef      DMA2D_InitStruct;
+    DMA2D_InitTypeDef DMA2D_InitStruct;
 
- uint32_t  Xaddress = 0;
- uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
+    uint32_t Xaddress = 0;
+    uint16_t Red_Value = 0, Green_Value = 0, Blue_Value = 0;
 
- Red_Value = (0xF800 & CurrentTextColor) >> 11;
- Blue_Value = 0x001F & CurrentTextColor;
- Green_Value = (0x07E0 & CurrentTextColor) >> 5;
+    Red_Value = (0xF800 & CurrentTextColor) >> 11;
+    Blue_Value = 0x001F & CurrentTextColor;
+    Green_Value = (0x07E0 & CurrentTextColor) >> 5;
 
- Xaddress = CurrentFrameBuffer + 2*(LCD_PIXEL_WIDTH*Ypos + Xpos);
+    Xaddress = CurrentFrameBuffer + 2 * (LCD_PIXEL_WIDTH * Ypos + Xpos);
 
- /* configure DMA2D */
- DMA2D_DeInit();
- DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
- DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
- DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
- DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
- DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
- DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
- DMA2D_InitStruct.DMA2D_OutputMemoryAdd = Xaddress;
- DMA2D_InitStruct.DMA2D_OutputOffset = (LCD_PIXEL_WIDTH - Width);
- DMA2D_InitStruct.DMA2D_NumberOfLine = Height;
- DMA2D_InitStruct.DMA2D_PixelPerLine = Width;
- DMA2D_Init(&DMA2D_InitStruct);
+    /* configure DMA2D */
+    DMA2D_DeInit();
+    DMA2D_InitStruct.DMA2D_Mode = DMA2D_R2M;
+    DMA2D_InitStruct.DMA2D_CMode = DMA2D_RGB565;
+    DMA2D_InitStruct.DMA2D_OutputGreen = Green_Value;
+    DMA2D_InitStruct.DMA2D_OutputBlue = Blue_Value;
+    DMA2D_InitStruct.DMA2D_OutputRed = Red_Value;
+    DMA2D_InitStruct.DMA2D_OutputAlpha = 0x0F;
+    DMA2D_InitStruct.DMA2D_OutputMemoryAdd = Xaddress;
+    DMA2D_InitStruct.DMA2D_OutputOffset = (LCD_PIXEL_WIDTH - Width);
+    DMA2D_InitStruct.DMA2D_NumberOfLine = Height;
+    DMA2D_InitStruct.DMA2D_PixelPerLine = Width;
+    DMA2D_Init(&DMA2D_InitStruct);
 
- /* Start Transfer */
- DMA2D_StartTransfer();
+    /* Start Transfer */
+    DMA2D_StartTransfer();
 
- /* Wait for CTC Flag activation */
- while(DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
- {
- }
+    /* Wait for CTC Flag activation */
+    while (DMA2D_GetFlagStatus(DMA2D_FLAG_TC) == RESET)
+    {
+    }
 
- LCD_SetTextColor(CurrentTextColor);
+    LCD_SetTextColor(CurrentTextColor);
 }
 
 /**
@@ -1247,42 +1229,41 @@ void LCD_DrawFullRect(uint16_t Xpos, uint16_t Ypos, uint16_t Width, uint16_t Hei
  */
 void LCD_DrawFullCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
 {
- int32_t  D;    /* Decision Variable */
- uint32_t  CurX;/* Current X Value */
- uint32_t  CurY;/* Current Y Value */
+    int32_t D;     /* Decision Variable */
+    uint32_t CurX; /* Current X Value */
+    uint32_t CurY; /* Current Y Value */
 
- D = 3 - (Radius << 1);
+    D = 3 - (Radius << 1);
 
- CurX = 0;
- CurY = Radius;
-	
+    CurX = 0;
+    CurY = Radius;
 
- while (CurX <= CurY)
- {
-   if(CurY > 0)
-   {
-     LCD_DrawLine(Xpos - CurX, Ypos - CurY, 2*CurY, LCD_DIR_VERTICAL);
-     LCD_DrawLine(Xpos + CurX, Ypos - CurY, 2*CurY, LCD_DIR_VERTICAL);
-   }
+    while (CurX <= CurY)
+    {
+        if (CurY > 0)
+        {
+            LCD_DrawLine(Xpos - CurX, Ypos - CurY, 2 * CurY, LCD_DIR_VERTICAL);
+            LCD_DrawLine(Xpos + CurX, Ypos - CurY, 2 * CurY, LCD_DIR_VERTICAL);
+        }
 
-   if(CurX > 0)
-   {
-     LCD_DrawLine(Xpos - CurY, Ypos - CurX, 2*CurX, LCD_DIR_VERTICAL);
-     LCD_DrawLine(Xpos + CurY, Ypos - CurX, 2*CurX, LCD_DIR_VERTICAL);
-   }
-   if (D < 0)
-   {
-     D += (CurX << 2) + 6;
-   }
-   else
-   {
-     D += ((CurX - CurY) << 2) + 10;
-     CurY--;
-   }
-   CurX++;
- }
+        if (CurX > 0)
+        {
+            LCD_DrawLine(Xpos - CurY, Ypos - CurX, 2 * CurX, LCD_DIR_VERTICAL);
+            LCD_DrawLine(Xpos + CurY, Ypos - CurX, 2 * CurX, LCD_DIR_VERTICAL);
+        }
+        if (D < 0)
+        {
+            D += (CurX << 2) + 6;
+        }
+        else
+        {
+            D += ((CurX - CurY) << 2) + 10;
+            CurY--;
+        }
+        CurX++;
+    }
 
- LCD_DrawCircle(Xpos, Ypos, Radius);
+    LCD_DrawCircle(Xpos, Ypos, Radius);
 }
 
 /**
@@ -1295,69 +1276,69 @@ void LCD_DrawFullCircle(uint16_t Xpos, uint16_t Ypos, uint16_t Radius)
  */
 void LCD_DrawUniLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
- int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
- yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
- curpixel = 0;
+    int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
+            yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
+            curpixel = 0;
 
- deltax = ABS(x2 - x1);        /* The difference between the x's */
- deltay = ABS(y2 - y1);        /* The difference between the y's */
- x = x1;                       /* Start x off at the first pixel */
- y = y1;                       /* Start y off at the first pixel */
+    deltax = ABS(x2 - x1); /* The difference between the x's */
+    deltay = ABS(y2 - y1); /* The difference between the y's */
+    x = x1;                /* Start x off at the first pixel */
+    y = y1;                /* Start y off at the first pixel */
 
- if (x2 >= x1)                 /* The x-values are increasing */
- {
-   xinc1 = 1;
-   xinc2 = 1;
- }
- else                          /* The x-values are decreasing */
- {
-   xinc1 = -1;
-   xinc2 = -1;
- }
+    if (x2 >= x1) /* The x-values are increasing */
+    {
+        xinc1 = 1;
+        xinc2 = 1;
+    }
+    else /* The x-values are decreasing */
+    {
+        xinc1 = -1;
+        xinc2 = -1;
+    }
 
- if (y2 >= y1)                 /* The y-values are increasing */
- {
-   yinc1 = 1;
-   yinc2 = 1;
- }
- else                          /* The y-values are decreasing */
- {
-   yinc1 = -1;
-   yinc2 = -1;
- }
+    if (y2 >= y1) /* The y-values are increasing */
+    {
+        yinc1 = 1;
+        yinc2 = 1;
+    }
+    else /* The y-values are decreasing */
+    {
+        yinc1 = -1;
+        yinc2 = -1;
+    }
 
- if (deltax >= deltay)         /* There is at least one x-value for every y-value */
- {
-   xinc1 = 0;                  /* Don't change the x when numerator >= denominator */
-   yinc2 = 0;                  /* Don't change the y for every iteration */
-   den = deltax;
-   num = deltax / 2;
-   numadd = deltay;
-   numpixels = deltax;         /* There are more x-values than y-values */
- }
- else                          /* There is at least one y-value for every x-value */
- {
-   xinc2 = 0;                  /* Don't change the x for every iteration */
-   yinc1 = 0;                  /* Don't change the y when numerator >= denominator */
-   den = deltay;
-   num = deltay / 2;
-   numadd = deltax;
-   numpixels = deltay;         /* There are more y-values than x-values */
- }
+    if (deltax >= deltay) /* There is at least one x-value for every y-value */
+    {
+        xinc1 = 0; /* Don't change the x when numerator >= denominator */
+        yinc2 = 0; /* Don't change the y for every iteration */
+        den = deltax;
+        num = deltax / 2;
+        numadd = deltay;
+        numpixels = deltax; /* There are more x-values than y-values */
+    }
+    else /* There is at least one y-value for every x-value */
+    {
+        xinc2 = 0; /* Don't change the x for every iteration */
+        yinc1 = 0; /* Don't change the y when numerator >= denominator */
+        den = deltay;
+        num = deltay / 2;
+        numadd = deltax;
+        numpixels = deltay; /* There are more y-values than x-values */
+    }
 
- for (curpixel = 0; curpixel <= numpixels; curpixel++)
- {
-   PutPixel(x, y);             /* Draw the current pixel */
-   num += numadd;              /* Increase the numerator by the top of the fraction */
-   if (num >= den)             /* Check if numerator >= denominator */
-   {
-     num -= den;               /* Calculate the new numerator value */
-     x += xinc1;               /* Change the x as appropriate */
-     y += yinc1;               /* Change the y as appropriate */
-   }
-   x += xinc2;                 /* Change the x as appropriate */
-   y += yinc2;                 /* Change the y as appropriate */
- }
+    for (curpixel = 0; curpixel <= numpixels; curpixel++)
+    {
+        PutPixel(x, y); /* Draw the current pixel */
+        num += numadd;  /* Increase the numerator by the top of the fraction */
+        if (num >= den) /* Check if numerator >= denominator */
+        {
+            num -= den; /* Calculate the new numerator value */
+            x += xinc1; /* Change the x as appropriate */
+            y += yinc1; /* Change the y as appropriate */
+        }
+        x += xinc2; /* Change the x as appropriate */
+        y += yinc2; /* Change the y as appropriate */
+    }
 }
 
 /**
@@ -1367,22 +1348,22 @@ void LCD_DrawUniLine(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
  */
 void LCD_Triangle(pPoint Points, uint16_t PointCount)
 {
- int16_t X = 0, Y = 0;
- pPoint First = Points;
+    int16_t X = 0, Y = 0;
+    pPoint First = Points;
 
- if(PointCount != 3)
- {
-   return;
- }
+    if (PointCount != 3)
+    {
+        return;
+    }
 
- while(--PointCount)
- {
-   X = Points->X;
-   Y = Points->Y;
-   Points++;
-   LCD_DrawUniLine(X, Y, Points->X, Points->Y);
- }
- LCD_DrawUniLine(First->X, First->Y, Points->X, Points->Y);
+    while (--PointCount)
+    {
+        X = Points->X;
+        Y = Points->Y;
+        Points++;
+        LCD_DrawUniLine(X, Y, Points->X, Points->Y);
+    }
+    LCD_DrawUniLine(First->X, First->Y, Points->X, Points->Y);
 }
 
 /**
@@ -1394,72 +1375,70 @@ void LCD_Triangle(pPoint Points, uint16_t PointCount)
 void LCD_FillTriangle(uint16_t x1, uint16_t x2, uint16_t x3, uint16_t y1, uint16_t y2, uint16_t y3)
 {
 
- int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
- yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
- curpixel = 0;
+    int16_t deltax = 0, deltay = 0, x = 0, y = 0, xinc1 = 0, xinc2 = 0,
+            yinc1 = 0, yinc2 = 0, den = 0, num = 0, numadd = 0, numpixels = 0,
+            curpixel = 0;
 
- deltax = ABS(x2 - x1);        /* The difference between the x's */
- deltay = ABS(y2 - y1);        /* The difference between the y's */
- x = x1;                       /* Start x off at the first pixel */
- y = y1;                       /* Start y off at the first pixel */
+    deltax = ABS(x2 - x1); /* The difference between the x's */
+    deltay = ABS(y2 - y1); /* The difference between the y's */
+    x = x1;                /* Start x off at the first pixel */
+    y = y1;                /* Start y off at the first pixel */
 
- if (x2 >= x1)                 /* The x-values are increasing */
- {
-   xinc1 = 1;
-   xinc2 = 1;
- }
- else                          /* The x-values are decreasing */
- {
-   xinc1 = -1;
-   xinc2 = -1;
- }
+    if (x2 >= x1) /* The x-values are increasing */
+    {
+        xinc1 = 1;
+        xinc2 = 1;
+    }
+    else /* The x-values are decreasing */
+    {
+        xinc1 = -1;
+        xinc2 = -1;
+    }
 
- if (y2 >= y1)                 /* The y-values are increasing */
- {
-   yinc1 = 1;
-   yinc2 = 1;
- }
- else                          /* The y-values are decreasing */
- {
-   yinc1 = -1;
-   yinc2 = -1;
- }
+    if (y2 >= y1) /* The y-values are increasing */
+    {
+        yinc1 = 1;
+        yinc2 = 1;
+    }
+    else /* The y-values are decreasing */
+    {
+        yinc1 = -1;
+        yinc2 = -1;
+    }
 
- if (deltax >= deltay)         /* There is at least one x-value for every y-value */
- {
-   xinc1 = 0;                  /* Don't change the x when numerator >= denominator */
-   yinc2 = 0;                  /* Don't change the y for every iteration */
-   den = deltax;
-   num = deltax / 2;
-   numadd = deltay;
-   numpixels = deltax;         /* There are more x-values than y-values */
- }
- else                          /* There is at least one y-value for every x-value */
- {
-   xinc2 = 0;                  /* Don't change the x for every iteration */
-   yinc1 = 0;                  /* Don't change the y when numerator >= denominator */
-   den = deltay;
-   num = deltay / 2;
-   numadd = deltax;
-   numpixels = deltay;         /* There are more y-values than x-values */
- }
+    if (deltax >= deltay) /* There is at least one x-value for every y-value */
+    {
+        xinc1 = 0; /* Don't change the x when numerator >= denominator */
+        yinc2 = 0; /* Don't change the y for every iteration */
+        den = deltax;
+        num = deltax / 2;
+        numadd = deltay;
+        numpixels = deltax; /* There are more x-values than y-values */
+    }
+    else /* There is at least one y-value for every x-value */
+    {
+        xinc2 = 0; /* Don't change the x for every iteration */
+        yinc1 = 0; /* Don't change the y when numerator >= denominator */
+        den = deltay;
+        num = deltay / 2;
+        numadd = deltax;
+        numpixels = deltay; /* There are more y-values than x-values */
+    }
 
- for (curpixel = 0; curpixel <= numpixels; curpixel++)
- {
-   LCD_DrawUniLine(x, y, x3, y3);
+    for (curpixel = 0; curpixel <= numpixels; curpixel++)
+    {
+        LCD_DrawUniLine(x, y, x3, y3);
 
-   num += numadd;              /* Increase the numerator by the top of the fraction */
-   if (num >= den)             /* Check if numerator >= denominator */
-   {
-     num -= den;               /* Calculate the new numerator value */
-     x += xinc1;               /* Change the x as appropriate */
-     y += yinc1;               /* Change the y as appropriate */
-   }
-   x += xinc2;                 /* Change the x as appropriate */
-   y += yinc2;                 /* Change the y as appropriate */
- }
-
-
+        num += numadd;  /* Increase the numerator by the top of the fraction */
+        if (num >= den) /* Check if numerator >= denominator */
+        {
+            num -= den; /* Calculate the new numerator value */
+            x += xinc1; /* Change the x as appropriate */
+            y += yinc1; /* Change the y as appropriate */
+        }
+        x += xinc2; /* Change the x as appropriate */
+        y += yinc2; /* Change the y as appropriate */
+    }
 }
 /**
  * @brief  Displays an poly-line (between many points).
@@ -1469,20 +1448,20 @@ void LCD_FillTriangle(uint16_t x1, uint16_t x2, uint16_t x3, uint16_t y1, uint16
  */
 void LCD_PolyLine(pPoint Points, uint16_t PointCount)
 {
- int16_t X = 0, Y = 0;
+    int16_t X = 0, Y = 0;
 
- if(PointCount < 2)
- {
-   return;
- }
+    if (PointCount < 2)
+    {
+        return;
+    }
 
- while(--PointCount)
- {
-   X = Points->X;
-   Y = Points->Y;
-   Points++;
-   LCD_DrawUniLine(X, Y, Points->X, Points->Y);
- }
+    while (--PointCount)
+    {
+        X = Points->X;
+        Y = Points->Y;
+        Points++;
+        LCD_DrawUniLine(X, Y, Points->X, Points->Y);
+    }
 }
 
 /**
@@ -1495,26 +1474,26 @@ void LCD_PolyLine(pPoint Points, uint16_t PointCount)
  */
 static void LCD_PolyLineRelativeClosed(pPoint Points, uint16_t PointCount, uint16_t Closed)
 {
- int16_t X = 0, Y = 0;
- pPoint First = Points;
+    int16_t X = 0, Y = 0;
+    pPoint First = Points;
 
- if(PointCount < 2)
- {
-   return;
- }
- X = Points->X;
- Y = Points->Y;
- while(--PointCount)
- {
-   Points++;
-   LCD_DrawUniLine(X, Y, X + Points->X, Y + Points->Y);
-   X = X + Points->X;
-   Y = Y + Points->Y;
- }
- if(Closed)
- {
-   LCD_DrawUniLine(First->X, First->Y, X, Y);
- }
+    if (PointCount < 2)
+    {
+        return;
+    }
+    X = Points->X;
+    Y = Points->Y;
+    while (--PointCount)
+    {
+        Points++;
+        LCD_DrawUniLine(X, Y, X + Points->X, Y + Points->Y);
+        X = X + Points->X;
+        Y = Y + Points->Y;
+    }
+    if (Closed)
+    {
+        LCD_DrawUniLine(First->X, First->Y, X, Y);
+    }
 }
 
 /**
@@ -1525,8 +1504,8 @@ static void LCD_PolyLineRelativeClosed(pPoint Points, uint16_t PointCount, uint1
  */
 void LCD_ClosedPolyLine(pPoint Points, uint16_t PointCount)
 {
- LCD_PolyLine(Points, PointCount);
- LCD_DrawUniLine(Points->X, Points->Y, (Points+PointCount-1)->X, (Points+PointCount-1)->Y);
+    LCD_PolyLine(Points, PointCount);
+    LCD_DrawUniLine(Points->X, Points->Y, (Points + PointCount - 1)->X, (Points + PointCount - 1)->Y);
 }
 
 /**
@@ -1537,7 +1516,7 @@ void LCD_ClosedPolyLine(pPoint Points, uint16_t PointCount)
  */
 void LCD_PolyLineRelative(pPoint Points, uint16_t PointCount)
 {
- LCD_PolyLineRelativeClosed(Points, PointCount, 0);
+    LCD_PolyLineRelativeClosed(Points, PointCount, 0);
 }
 
 /**
@@ -1548,7 +1527,7 @@ void LCD_PolyLineRelative(pPoint Points, uint16_t PointCount)
  */
 void LCD_ClosedPolyLineRelative(pPoint Points, uint16_t PointCount)
 {
- LCD_PolyLineRelativeClosed(Points, PointCount, 1);
+    LCD_PolyLineRelativeClosed(Points, PointCount, 1);
 }
 
 /**
@@ -1560,66 +1539,63 @@ void LCD_ClosedPolyLineRelative(pPoint Points, uint16_t PointCount)
 void LCD_FillPolyLine(pPoint Points, uint16_t PointCount)
 {
 
- int16_t X = 0, Y = 0, X2 = 0, Y2 = 0, X_center = 0, Y_center = 0, X_first = 0, Y_first = 0, pixelX = 0, pixelY = 0, counter = 0;
- uint16_t  IMAGE_LEFT = 0, IMAGE_RIGHT = 0, IMAGE_TOP = 0, IMAGE_BOTTOM = 0;
+    int16_t X = 0, Y = 0, X2 = 0, Y2 = 0, X_center = 0, Y_center = 0, X_first = 0, Y_first = 0, pixelX = 0, pixelY = 0, counter = 0;
+    uint16_t IMAGE_LEFT = 0, IMAGE_RIGHT = 0, IMAGE_TOP = 0, IMAGE_BOTTOM = 0;
 
- IMAGE_LEFT = IMAGE_RIGHT = Points->X;
- IMAGE_TOP= IMAGE_BOTTOM = Points->Y;
+    IMAGE_LEFT = IMAGE_RIGHT = Points->X;
+    IMAGE_TOP = IMAGE_BOTTOM = Points->Y;
 
- for(counter = 1; counter < PointCount; counter++)
- {
-   pixelX = POLY_X(counter);
-   if(pixelX < IMAGE_LEFT)
-   {
-     IMAGE_LEFT = pixelX;
-   }
-   if(pixelX > IMAGE_RIGHT)
-   {
-     IMAGE_RIGHT = pixelX;
-   }
+    for (counter = 1; counter < PointCount; counter++)
+    {
+        pixelX = POLY_X(counter);
+        if (pixelX < IMAGE_LEFT)
+        {
+            IMAGE_LEFT = pixelX;
+        }
+        if (pixelX > IMAGE_RIGHT)
+        {
+            IMAGE_RIGHT = pixelX;
+        }
 
-   pixelY = POLY_Y(counter);
-   if(pixelY < IMAGE_TOP)
-   {
-     IMAGE_TOP = pixelY;
-   }
-   if(pixelY > IMAGE_BOTTOM)
-   {
-     IMAGE_BOTTOM = pixelY;
-   }
- }
+        pixelY = POLY_Y(counter);
+        if (pixelY < IMAGE_TOP)
+        {
+            IMAGE_TOP = pixelY;
+        }
+        if (pixelY > IMAGE_BOTTOM)
+        {
+            IMAGE_BOTTOM = pixelY;
+        }
+    }
 
- if(PointCount < 2)
- {
-   return;
- }
+    if (PointCount < 2)
+    {
+        return;
+    }
 
- X_center = (IMAGE_LEFT + IMAGE_RIGHT)/2;
- Y_center = (IMAGE_BOTTOM + IMAGE_TOP)/2;
+    X_center = (IMAGE_LEFT + IMAGE_RIGHT) / 2;
+    Y_center = (IMAGE_BOTTOM + IMAGE_TOP) / 2;
 
- X_first = Points->X;
- Y_first = Points->Y;
+    X_first = Points->X;
+    Y_first = Points->Y;
 
- while(--PointCount)
- {
-   X = Points->X;
-   Y = Points->Y;
-   Points++;
-   X2 = Points->X;
-   Y2 = Points->Y;
+    while (--PointCount)
+    {
+        X = Points->X;
+        Y = Points->Y;
+        Points++;
+        X2 = Points->X;
+        Y2 = Points->Y;
 
-   LCD_FillTriangle(X, X2, X_center, Y, Y2, Y_center);
-   LCD_FillTriangle(X, X_center, X2, Y, Y_center, Y2);
-   LCD_FillTriangle(X_center, X2, X, Y_center, Y2, Y);
- }
+        LCD_FillTriangle(X, X2, X_center, Y, Y2, Y_center);
+        LCD_FillTriangle(X, X_center, X2, Y, Y_center, Y2);
+        LCD_FillTriangle(X_center, X2, X, Y_center, Y2, Y);
+    }
 
- LCD_FillTriangle(X_first, X2, X_center, Y_first, Y2, Y_center);
- LCD_FillTriangle(X_first, X_center, X2, Y_first, Y_center, Y2);
- LCD_FillTriangle(X_center, X2, X_first, Y_center, Y2, Y_first);
+    LCD_FillTriangle(X_first, X2, X_center, Y_first, Y2, Y_center);
+    LCD_FillTriangle(X_first, X_center, X2, Y_first, Y_center, Y2);
+    LCD_FillTriangle(X_center, X2, X_first, Y_center, Y2, Y_first);
 }
-
-
-
 
 /**
  * @brief  Sets or reset LCD control lines.
@@ -1635,176 +1611,172 @@ void LCD_FillPolyLine(pPoint Points, uint16_t PointCount)
  *     @arg Bit_SET: to set the port pin
  * @retval None
  */
-void LCD_CtrlLinesWrite(GPIO_TypeDef* GPIOx, uint16_t CtrlPins, BitAction BitVal)
+void LCD_CtrlLinesWrite(GPIO_TypeDef *GPIOx, uint16_t CtrlPins, BitAction BitVal)
 {
- /* Set or Reset the control line */
- GPIO_WriteBit(GPIOx, (uint16_t)CtrlPins, (BitAction)BitVal);
+    /* Set or Reset the control line */
+    GPIO_WriteBit(GPIOx, (uint16_t)CtrlPins, (BitAction)BitVal);
 }
-
-
-
 
 static void LCD_GPIO_Config(void)
 {
- GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitTypeDef GPIO_InitStruct;
 
- /* 使能LCD使用到的引脚时钟 */
-                         //红色数据线
- RCC_AHB1PeriphClockCmd(LTDC_R0_GPIO_CLK | LTDC_R1_GPIO_CLK | LTDC_R2_GPIO_CLK|
-                        LTDC_R3_GPIO_CLK | LTDC_R4_GPIO_CLK | LTDC_R5_GPIO_CLK|
-                        LTDC_R6_GPIO_CLK | LTDC_R7_GPIO_CLK |
-                         //绿色数据线
-                         LTDC_G0_GPIO_CLK|LTDC_G1_GPIO_CLK|LTDC_G2_GPIO_CLK|
-                         LTDC_G3_GPIO_CLK|LTDC_G4_GPIO_CLK|LTDC_G5_GPIO_CLK|
-                         LTDC_G6_GPIO_CLK|LTDC_G7_GPIO_CLK|
-                         //蓝色数据线
-                         LTDC_B0_GPIO_CLK|LTDC_B1_GPIO_CLK|LTDC_B2_GPIO_CLK|
-                         LTDC_B3_GPIO_CLK|LTDC_B4_GPIO_CLK|LTDC_B5_GPIO_CLK|
-                         LTDC_B6_GPIO_CLK|LTDC_B7_GPIO_CLK|
-                         //控制信号线
-                         LTDC_CLK_GPIO_CLK | LTDC_HSYNC_GPIO_CLK |LTDC_VSYNC_GPIO_CLK|
-                         LTDC_DE_GPIO_CLK  | LTDC_BL_GPIO_CLK    |LTDC_DISP_GPIO_CLK ,ENABLE);
+    /* 使能LCD使用到的引脚时钟 */
+    // 红色数据线
+    RCC_AHB1PeriphClockCmd(LTDC_R0_GPIO_CLK | LTDC_R1_GPIO_CLK | LTDC_R2_GPIO_CLK |
+                               LTDC_R3_GPIO_CLK | LTDC_R4_GPIO_CLK | LTDC_R5_GPIO_CLK |
+                               LTDC_R6_GPIO_CLK | LTDC_R7_GPIO_CLK |
+                               // 绿色数据线
+                               LTDC_G0_GPIO_CLK | LTDC_G1_GPIO_CLK | LTDC_G2_GPIO_CLK |
+                               LTDC_G3_GPIO_CLK | LTDC_G4_GPIO_CLK | LTDC_G5_GPIO_CLK |
+                               LTDC_G6_GPIO_CLK | LTDC_G7_GPIO_CLK |
+                               // 蓝色数据线
+                               LTDC_B0_GPIO_CLK | LTDC_B1_GPIO_CLK | LTDC_B2_GPIO_CLK |
+                               LTDC_B3_GPIO_CLK | LTDC_B4_GPIO_CLK | LTDC_B5_GPIO_CLK |
+                               LTDC_B6_GPIO_CLK | LTDC_B7_GPIO_CLK |
+                               // 控制信号线
+                               LTDC_CLK_GPIO_CLK | LTDC_HSYNC_GPIO_CLK | LTDC_VSYNC_GPIO_CLK |
+                               LTDC_DE_GPIO_CLK | LTDC_BL_GPIO_CLK | LTDC_DISP_GPIO_CLK,
+                           ENABLE);
 
+    /* GPIO配置 */
 
-/* GPIO配置 */
+    /* 红色数据线 */
+    GPIO_InitStruct.GPIO_Pin = LTDC_R0_GPIO_PIN;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
 
-/* 红色数据线 */
- GPIO_InitStruct.GPIO_Pin = LTDC_R0_GPIO_PIN;
- GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
- GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AF;
- GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
- GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_Init(LTDC_R0_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R0_GPIO_PORT, LTDC_R0_PINSOURCE, LTDC_R0_AF);
 
- GPIO_Init(LTDC_R0_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R0_GPIO_PORT, LTDC_R0_PINSOURCE, LTDC_R0_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R1_GPIO_PIN;
+    GPIO_Init(LTDC_R1_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R1_GPIO_PORT, LTDC_R1_PINSOURCE, LTDC_R1_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R1_GPIO_PIN;
- GPIO_Init(LTDC_R1_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R1_GPIO_PORT, LTDC_R1_PINSOURCE, LTDC_R1_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R2_GPIO_PIN;
+    GPIO_Init(LTDC_R2_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R2_GPIO_PORT, LTDC_R2_PINSOURCE, LTDC_R2_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R2_GPIO_PIN;
- GPIO_Init(LTDC_R2_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R2_GPIO_PORT, LTDC_R2_PINSOURCE, LTDC_R2_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R3_GPIO_PIN;
+    GPIO_Init(LTDC_R3_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R3_GPIO_PORT, LTDC_R3_PINSOURCE, LTDC_R3_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R3_GPIO_PIN;
- GPIO_Init(LTDC_R3_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R3_GPIO_PORT, LTDC_R3_PINSOURCE, LTDC_R3_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R4_GPIO_PIN;
+    GPIO_Init(LTDC_R4_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R4_GPIO_PORT, LTDC_R4_PINSOURCE, LTDC_R4_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R4_GPIO_PIN;
- GPIO_Init(LTDC_R4_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R4_GPIO_PORT, LTDC_R4_PINSOURCE, LTDC_R4_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R5_GPIO_PIN;
+    GPIO_Init(LTDC_R5_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R5_GPIO_PORT, LTDC_R5_PINSOURCE, LTDC_R5_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R5_GPIO_PIN;
- GPIO_Init(LTDC_R5_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R5_GPIO_PORT, LTDC_R5_PINSOURCE, LTDC_R5_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R6_GPIO_PIN;
+    GPIO_Init(LTDC_R6_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R6_GPIO_PORT, LTDC_R6_PINSOURCE, LTDC_R6_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R6_GPIO_PIN;
- GPIO_Init(LTDC_R6_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R6_GPIO_PORT, LTDC_R6_PINSOURCE, LTDC_R6_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_R7_GPIO_PIN;
+    GPIO_Init(LTDC_R7_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_R7_GPIO_PORT, LTDC_R7_PINSOURCE, LTDC_R7_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_R7_GPIO_PIN;
- GPIO_Init(LTDC_R7_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_R7_GPIO_PORT, LTDC_R7_PINSOURCE, LTDC_R7_AF);
+    // 绿色数据线
+    GPIO_InitStruct.GPIO_Pin = LTDC_G0_GPIO_PIN;
+    GPIO_Init(LTDC_G0_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G0_GPIO_PORT, LTDC_G0_PINSOURCE, LTDC_G0_AF);
 
- //绿色数据线
- GPIO_InitStruct.GPIO_Pin = LTDC_G0_GPIO_PIN;
- GPIO_Init(LTDC_G0_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G0_GPIO_PORT, LTDC_G0_PINSOURCE, LTDC_G0_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G1_GPIO_PIN;
+    GPIO_Init(LTDC_G1_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G1_GPIO_PORT, LTDC_G1_PINSOURCE, LTDC_G1_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G1_GPIO_PIN;
- GPIO_Init(LTDC_G1_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G1_GPIO_PORT, LTDC_G1_PINSOURCE, LTDC_G1_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G2_GPIO_PIN;
+    GPIO_Init(LTDC_G2_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G2_GPIO_PORT, LTDC_G2_PINSOURCE, LTDC_G2_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G2_GPIO_PIN;
- GPIO_Init(LTDC_G2_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G2_GPIO_PORT, LTDC_G2_PINSOURCE, LTDC_G2_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G3_GPIO_PIN;
+    GPIO_Init(LTDC_G3_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G3_GPIO_PORT, LTDC_G3_PINSOURCE, LTDC_G3_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G3_GPIO_PIN;
- GPIO_Init(LTDC_G3_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G3_GPIO_PORT, LTDC_G3_PINSOURCE, LTDC_G3_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G4_GPIO_PIN;
+    GPIO_Init(LTDC_G4_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G4_GPIO_PORT, LTDC_G4_PINSOURCE, LTDC_G4_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G4_GPIO_PIN;
- GPIO_Init(LTDC_G4_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G4_GPIO_PORT, LTDC_G4_PINSOURCE, LTDC_G4_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G5_GPIO_PIN;
+    GPIO_Init(LTDC_G5_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G5_GPIO_PORT, LTDC_G5_PINSOURCE, LTDC_G5_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G5_GPIO_PIN;
- GPIO_Init(LTDC_G5_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G5_GPIO_PORT, LTDC_G5_PINSOURCE, LTDC_G5_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G6_GPIO_PIN;
+    GPIO_Init(LTDC_G6_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G6_GPIO_PORT, LTDC_G6_PINSOURCE, LTDC_G6_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G6_GPIO_PIN;
- GPIO_Init(LTDC_G6_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G6_GPIO_PORT, LTDC_G6_PINSOURCE, LTDC_G6_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_G7_GPIO_PIN;
+    GPIO_Init(LTDC_G7_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_G7_GPIO_PORT, LTDC_G7_PINSOURCE, LTDC_G7_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_G7_GPIO_PIN;
- GPIO_Init(LTDC_G7_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_G7_GPIO_PORT, LTDC_G7_PINSOURCE, LTDC_G7_AF);
+    // 蓝色数据线
+    GPIO_InitStruct.GPIO_Pin = LTDC_B0_GPIO_PIN;
+    GPIO_Init(LTDC_B0_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B0_GPIO_PORT, LTDC_B0_PINSOURCE, LTDC_B0_AF);
 
- //蓝色数据线
- GPIO_InitStruct.GPIO_Pin = LTDC_B0_GPIO_PIN;
- GPIO_Init(LTDC_B0_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B0_GPIO_PORT, LTDC_B0_PINSOURCE, LTDC_B0_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B1_GPIO_PIN;
+    GPIO_Init(LTDC_B1_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B1_GPIO_PORT, LTDC_B1_PINSOURCE, LTDC_B1_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B1_GPIO_PIN;
- GPIO_Init(LTDC_B1_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B1_GPIO_PORT, LTDC_B1_PINSOURCE, LTDC_B1_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B2_GPIO_PIN;
+    GPIO_Init(LTDC_B2_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B2_GPIO_PORT, LTDC_B2_PINSOURCE, LTDC_B2_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B2_GPIO_PIN;
- GPIO_Init(LTDC_B2_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B2_GPIO_PORT, LTDC_B2_PINSOURCE, LTDC_B2_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B3_GPIO_PIN;
+    GPIO_Init(LTDC_B3_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B3_GPIO_PORT, LTDC_B3_PINSOURCE, LTDC_B3_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B3_GPIO_PIN;
- GPIO_Init(LTDC_B3_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B3_GPIO_PORT, LTDC_B3_PINSOURCE, LTDC_B3_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B4_GPIO_PIN;
+    GPIO_Init(LTDC_B4_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B4_GPIO_PORT, LTDC_B4_PINSOURCE, LTDC_B4_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B4_GPIO_PIN;
- GPIO_Init(LTDC_B4_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B4_GPIO_PORT, LTDC_B4_PINSOURCE, LTDC_B4_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B5_GPIO_PIN;
+    GPIO_Init(LTDC_B5_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B5_GPIO_PORT, LTDC_B5_PINSOURCE, LTDC_B5_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B5_GPIO_PIN;
- GPIO_Init(LTDC_B5_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B5_GPIO_PORT, LTDC_B5_PINSOURCE, LTDC_B5_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B6_GPIO_PIN;
+    GPIO_Init(LTDC_B6_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B6_GPIO_PORT, LTDC_B6_PINSOURCE, LTDC_B6_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B6_GPIO_PIN;
- GPIO_Init(LTDC_B6_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B6_GPIO_PORT, LTDC_B6_PINSOURCE, LTDC_B6_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_B7_GPIO_PIN;
+    GPIO_Init(LTDC_B7_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_B7_GPIO_PORT, LTDC_B7_PINSOURCE, LTDC_B7_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_B7_GPIO_PIN;
- GPIO_Init(LTDC_B7_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_B7_GPIO_PORT, LTDC_B7_PINSOURCE, LTDC_B7_AF);
+    // 控制信号线
+    GPIO_InitStruct.GPIO_Pin = LTDC_CLK_GPIO_PIN;
+    GPIO_Init(LTDC_CLK_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_CLK_GPIO_PORT, LTDC_CLK_PINSOURCE, LTDC_CLK_AF);
 
- //控制信号线
- GPIO_InitStruct.GPIO_Pin = LTDC_CLK_GPIO_PIN;
- GPIO_Init(LTDC_CLK_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_CLK_GPIO_PORT, LTDC_CLK_PINSOURCE, LTDC_CLK_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_HSYNC_GPIO_PIN;
+    GPIO_Init(LTDC_HSYNC_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_HSYNC_GPIO_PORT, LTDC_HSYNC_PINSOURCE, LTDC_HSYNC_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_HSYNC_GPIO_PIN;
- GPIO_Init(LTDC_HSYNC_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_HSYNC_GPIO_PORT, LTDC_HSYNC_PINSOURCE, LTDC_HSYNC_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_VSYNC_GPIO_PIN;
+    GPIO_Init(LTDC_VSYNC_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_VSYNC_GPIO_PORT, LTDC_VSYNC_PINSOURCE, LTDC_VSYNC_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_VSYNC_GPIO_PIN;
- GPIO_Init(LTDC_VSYNC_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_VSYNC_GPIO_PORT, LTDC_VSYNC_PINSOURCE, LTDC_VSYNC_AF);
+    GPIO_InitStruct.GPIO_Pin = LTDC_DE_GPIO_PIN;
+    GPIO_Init(LTDC_DE_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_PinAFConfig(LTDC_DE_GPIO_PORT, LTDC_DE_PINSOURCE, LTDC_DE_AF);
 
- GPIO_InitStruct.GPIO_Pin = LTDC_DE_GPIO_PIN;
- GPIO_Init(LTDC_DE_GPIO_PORT, &GPIO_InitStruct);
- GPIO_PinAFConfig(LTDC_DE_GPIO_PORT, LTDC_DE_PINSOURCE, LTDC_DE_AF);
+    // BL DISP
+    GPIO_InitStruct.GPIO_Pin = LTDC_DISP_GPIO_PIN;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
+    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_UP;
 
- //BL DISP
- GPIO_InitStruct.GPIO_Pin = LTDC_DISP_GPIO_PIN;
- GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
- GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT;
- GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
- GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_Init(LTDC_DISP_GPIO_PORT, &GPIO_InitStruct);
 
- GPIO_Init(LTDC_DISP_GPIO_PORT, &GPIO_InitStruct);
+    GPIO_InitStruct.GPIO_Pin = LTDC_BL_GPIO_PIN;
+    GPIO_Init(LTDC_BL_GPIO_PORT, &GPIO_InitStruct);
 
-
- GPIO_InitStruct.GPIO_Pin = LTDC_BL_GPIO_PIN;
- GPIO_Init(LTDC_BL_GPIO_PORT, &GPIO_InitStruct);
-
- //拉高使能lcd
- GPIO_SetBits(LTDC_DISP_GPIO_PORT,LTDC_DISP_GPIO_PIN);
- GPIO_SetBits(LTDC_BL_GPIO_PORT,LTDC_BL_GPIO_PIN);
+    // 拉高使能lcd
+    GPIO_SetBits(LTDC_DISP_GPIO_PORT, LTDC_DISP_GPIO_PIN);
+    GPIO_SetBits(LTDC_BL_GPIO_PORT, LTDC_BL_GPIO_PIN);
 }
 
 /**
@@ -1815,18 +1787,18 @@ static void LCD_GPIO_Config(void)
  */
 void PutPixel(int16_t x, int16_t y)
 {
- if(x < 0 || x > LCD_PIXEL_WIDTH || y < 0 || y > LCD_PIXEL_HEIGHT)
- {
-   return;
- }
+    if (x < 0 || x > LCD_PIXEL_WIDTH || y < 0 || y > LCD_PIXEL_HEIGHT)
+    {
+        return;
+    }
 #if 0
  LCD_DrawLine(x, y, 1, LCD_DIR_HORIZONTAL);
 #else
- {
-	  uint32_t  Xaddress = 0;
-    Xaddress = CurrentFrameBuffer + 2*(LCD_PIXEL_WIDTH*y + x);
-    *(__IO uint16_t*) Xaddress= CurrentTextColor;
-  }
+    {
+        uint32_t Xaddress = 0;
+        Xaddress = CurrentFrameBuffer + 2 * (LCD_PIXEL_WIDTH * y + x);
+        *(__IO uint16_t *)Xaddress = CurrentTextColor;
+    }
 #endif
 }
 
