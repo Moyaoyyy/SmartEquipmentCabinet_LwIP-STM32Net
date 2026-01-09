@@ -411,8 +411,14 @@ const uint8_t CTP_CFG_GT615[] = {
 // uint8_t config[GTP_CONFIG_MAX_LENGTH + GTP_ADDR_LENGTH]
 //                 = {GTP_REG_CONFIG_DATA >> 8, GTP_REG_CONFIG_DATA & 0xff};
 
-/* 触摸IC类型默认为5寸屏的ic */
-TOUCH_IC touchIC = GT9157;
+/* 触摸IC类型默认为7寸屏的ic (GT911)
+ * 如果你的屏幕是其他型号，请修改此处：
+ * GT9157 - 5寸屏
+ * GT911  - 7寸屏
+ * GT615  - 7寸屏
+ * GT5688 - 4.3寸屏
+ */
+TOUCH_IC touchIC = GT911;
 
 const TOUCH_PARAM_TypeDef touch_param[TOUCH_TYPE_NUM] =
     {

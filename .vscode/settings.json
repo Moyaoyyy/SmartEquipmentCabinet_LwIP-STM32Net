@@ -30,4 +30,5 @@
         "stdio.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": false,
+    "chatgpt.openOnStartup": true,
 }

@@ -13,7 +13,7 @@
 #define TASK_LVGL_NAME "Task_Lvgl"
 
 /** 栈大小（单位：word） */
-#define TASK_LVGL_STACK_SIZE 1024
+#define TASK_LVGL_STACK_SIZE 2048
 
 /** 优先级 */
 #define TASK_LVGL_PRIORITY 2
@@ -25,4 +25,3 @@ BaseType_t Task_Lvgl_Create(void);
 void Task_Lvgl(void *pvParameters);
 
 #endif /* __TASK_LVGL_H */
-
