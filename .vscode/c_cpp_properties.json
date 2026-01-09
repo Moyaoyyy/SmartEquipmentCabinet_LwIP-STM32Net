@@ -29,6 +29,7 @@
                 "${workspaceFolder}/mcu/bsp/sdram/Inc",
                 "${workspaceFolder}/mcu/bsp/touch/Inc",
                 "${workspaceFolder}/mcu/bsp/font/Inc",
+                "${workspaceFolder}/mcu/bsp/nfc/Inc",
 
                 // APP 应用层头文件示例，如有新增应用，可在此添加
                 "${workspaceFolder}/mcu/app/app_data/Inc",
