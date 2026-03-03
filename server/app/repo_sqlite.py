@@ -118,7 +118,7 @@ class SQLiteRepo:
                     net INTEGER,
                     door INTEGER,
                     cache INTEGER,
-                    drop INTEGER,
+                    drop_count INTEGER,
                     created_at TEXT NOT NULL
                 );
 
@@ -126,6 +126,41 @@ class SQLiteRepo:
                 CREATE INDEX IF NOT EXISTS idx_auth_created_at ON auth_decisions(created_at);
                 """
             )
+            # 兼容历史库：若旧版本已创建 `drop` 列，启动时自动迁移为 `drop_count`。
+            self._migrate_audit_events_schema(conn)
+
+    def _migrate_audit_events_schema(self, conn: sqlite3.Connection) -> None:
+        """
+        用途：迁移 audit_events 表中与关键字冲突的旧列名。
+
+        参数：
+        - conn: 当前数据库连接对象。
+
+        返回值：
+        - 无。
+
+        迁移规则：
+        - 已存在 `drop_count`：不处理。
+        - 存在旧列 `drop`：重命名为 `drop_count`。
+        - 两者都不存在：补加 `drop_count`（防御性兜底）。
+        """
+        exists = conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'audit_events' LIMIT 1"
+        ).fetchone()
+        if exists is None:
+            return
+
+        columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(audit_events)").fetchall()
+        }
+        if "drop_count" in columns:
+            return
+
+        if "drop" in columns:
+            conn.execute('ALTER TABLE audit_events RENAME COLUMN "drop" TO drop_count')
+            return
+
+        conn.execute("ALTER TABLE audit_events ADD COLUMN drop_count INTEGER")
 
     def get_device(self, device_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -292,11 +327,16 @@ class SQLiteRepo:
         返回值：
         - 无。
         """
+        # 协议层继续兼容 payload.drop；若后续上位改为 dropCount 也可直接接收。
+        drop_count = payload.get("drop")
+        if drop_count is None:
+            drop_count = payload.get("dropCount")
+
         with self._conn() as conn:
             conn.execute(
                 """
                 INSERT INTO audit_events
-                (trace_id, device_id, message_id, ev, sid, locker_id, uid, code, http, net, door, cache, drop, created_at)
+                (trace_id, device_id, message_id, ev, sid, locker_id, uid, code, http, net, door, cache, drop_count, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
@@ -312,7 +352,7 @@ class SQLiteRepo:
                     payload.get("net"),
                     payload.get("door"),
                     payload.get("cache"),
-                    payload.get("drop"),
+                    drop_count,
                     self._now_iso(),
                 ),
             )
