@@ -47,7 +47,7 @@ extern "C"
 #define UPLINK_MAX_DEVICE_ID_LEN 32
 #endif
 
-/** 事件类型字符串最大长度（含结尾 '\0'），例如 "LIGHT_ADC"、"RFID_EVENT" */
+/** 事件类型字符串最大长度（含结尾 '\0'），例如 "RFID_AUTH_REQ"、"RFID_AUDIT" */
 #ifndef UPLINK_MAX_TYPE_LEN
 #define UPLINK_MAX_TYPE_LEN 32
 #endif

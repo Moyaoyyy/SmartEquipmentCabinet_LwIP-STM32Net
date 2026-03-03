@@ -70,8 +70,6 @@ extern "C"
 
     uplink_err_t uplink_enqueue_json(uplink_t *u, const char *type, const char *payload_json);
 
-    uplink_err_t uplink_enqueue_light_adc(uplink_t *u, uint32_t adc_value);
-
     void uplink_poll(uplink_t *u);
 
     uint16_t uplink_get_queue_depth(uplink_t *u);

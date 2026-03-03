@@ -15,7 +15,7 @@
  *     "deviceId":"xxx",
  *     "messageId":123,
  *     "ts":1700000000,
- *     "type":"LIGHT_ADC",
+ *     "type":"RFID_AUDIT",
  *     "payload":{ ... }
  *  }
  * 
@@ -48,11 +48,6 @@ uplink_err_t uplink_codec_json_build_event(char *out_json,
 uplink_err_t uplink_codec_json_parse_app_code(const char *body,
                                               size_t body_len,
                                               int32_t *out_code);
-
-uplink_err_t uplink_codec_json_build_light_adc_payload(char *out_payload,
-                                                       size_t out_payload_len,
-                                                       uint32_t adc_value,
-                                                       size_t *out_written);
 
 #ifdef __cplusplus
 }

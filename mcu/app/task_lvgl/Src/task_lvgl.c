@@ -1,17 +1,16 @@
-/**
+﻿/**
  * @file    task_lvgl.c
  * @author  Yukikaze
- * @brief   LVGL GUI 任务：在 FreeRTOS 下驱动 LVGL，并对接 LCD/触摸
- * @version 0.1
- * @date    2026-01-03
- *
- * @copyright Copyright (c) 2026 Yukikaze
- *
+ * @brief   LVGL GUI 任务：储物柜业务界面状态机
+ * @version 0.2
+ * @date    2026-03-02
  */
 
 #include "task_lvgl.h"
 
+#include "app_data.h"
 #include "bsp_lcd.h"
+#include "bsp_locker.h"
 #include "bsp_i2c_touch.h"
 #include "gt9xx.h"
 
@@ -20,200 +19,423 @@
 #include "lv_port_indev.h"
 
 #include <stdio.h>
+#include <string.h>
 
 TaskHandle_t Task_Lvgl_Handle = NULL;
 
-static lv_obj_t * g_touch_counter_label;
-static uint32_t g_touch_counter;
+/**
+ * ============================================================================
+ * 界面对象
+ * ============================================================================
+ */
 
-static lv_obj_t * g_uplink_counter_label;
-static uint32_t g_uplink_counter;
+static lv_obj_t *g_labelTitle;
+static lv_obj_t *g_labelState;
+static lv_obj_t *g_labelHint;
+static lv_obj_t *g_labelResult;
+static lv_obj_t *g_labelNet;
 
-static void touch_plus_event_cb(lv_event_t * e)
+static lv_obj_t *g_btnMain;
+static lv_obj_t *g_btnMainLabel;
+static lv_obj_t *g_btnSecondary;
+static lv_obj_t *g_btnSecondaryLabel;
+
+static lv_obj_t *g_lockerBtns[APP_LOCKER_MAX_COUNT];
+static lv_obj_t *g_lockerBtnLabels[APP_LOCKER_MAX_COUNT];
+
+static AppSessionData_TypeDef g_lastSession;
+
+/**
+ * ============================================================================
+ * 内部工具函数
+ * ============================================================================
+ */
+
+/**
+ * @brief 状态枚举转文本
+ */
+static const char *Task_Lvgl_StateText(AppSessionState_TypeDef state)
 {
-    if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
-
-    g_touch_counter++;
-
-    char buf[32];
-    (void)snprintf(buf, sizeof(buf), "Check: %lu", (unsigned long)g_touch_counter);
-    lv_label_set_text(g_touch_counter_label, buf);
+    switch (state)
+    {
+    case APP_SESSION_STATE_IDLE_SELECT:
+        return "请选择门位";
+    case APP_SESSION_STATE_WAIT_CARD:
+        return "请刷校园卡";
+    case APP_SESSION_STATE_READING_CARD:
+        return "正在读取校园卡...";
+    case APP_SESSION_STATE_AUTH_PENDING:
+        return "正在验证身份...";
+    case APP_SESSION_STATE_AUTH_ALLOW_OPENED:
+        return "验证通过，已开门";
+    case APP_SESSION_STATE_AUTH_DENY:
+        return "验证未通过";
+    case APP_SESSION_STATE_NET_FAIL:
+        return "网络异常";
+    case APP_SESSION_STATE_DONE:
+        return "流程完成";
+    default:
+        return "状态未知";
+    }
 }
 
-static void uplink_event_cb(lv_event_t * e)
+/**
+ * @brief 门位按钮回调：选择目标门位
+ */
+static void Task_Lvgl_LockerBtnCb(lv_event_t *e)
 {
-    if(lv_event_get_code(e) != LV_EVENT_CLICKED) return;
+    uint32_t idx;
 
-    g_uplink_counter++;
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+    {
+        return;
+    }
 
-    char buf[32];
-    (void)snprintf(buf, sizeof(buf), "Uplink: %lu", (unsigned long)g_uplink_counter);
-    lv_label_set_text(g_uplink_counter_label, buf);
+    idx = (uint32_t)(uintptr_t)lv_event_get_user_data(e);
+    if (idx >= APP_LOCKER_MAX_COUNT)
+    {
+        return;
+    }
+
+    AppData_SetSelectedLocker((uint8_t)idx, 1U, Locker_GetId((uint8_t)idx));
 }
 
-static void lvgl_demo_create(void)
+/**
+ * @brief 主动作按钮回调
+ */
+static void Task_Lvgl_MainBtnCb(lv_event_t *e)
 {
-    lv_obj_t * scr = lv_screen_active();
+    AppSessionData_TypeDef session;
 
-    /* 屏幕背景：深蓝色 */
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+    {
+        return;
+    }
+
+    AppData_GetSessionData(&session);
+
+    if (session.state == APP_SESSION_STATE_AUTH_ALLOW_OPENED)
+    {
+        AppData_PostUiAction(APP_UI_ACTION_CONFIRM_DONE);
+    }
+    else if ((session.state == APP_SESSION_STATE_AUTH_DENY) ||
+             (session.state == APP_SESSION_STATE_NET_FAIL))
+    {
+        AppData_PostUiAction(APP_UI_ACTION_RETRY);
+    }
+}
+
+/**
+ * @brief 次动作按钮回调
+ */
+static void Task_Lvgl_SecondaryBtnCb(lv_event_t *e)
+{
+    if (lv_event_get_code(e) != LV_EVENT_CLICKED)
+    {
+        return;
+    }
+
+    AppData_PostUiAction(APP_UI_ACTION_BACK);
+}
+
+/**
+ * @brief 创建业务界面
+ */
+static void Task_Lvgl_CreateUi(void)
+{
+    lv_obj_t *scr = lv_screen_active();
+    lv_obj_t *locker_panel;
+    uint32_t i;
+
     lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_bg_color(scr, lv_color_hex(0x102A5C), 0);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x0E2C4A), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
-    /* 左上角计数器 */
-    g_touch_counter = 0;
-    g_touch_counter_label = lv_label_create(scr);
-    lv_label_set_text(g_touch_counter_label, "Check: 0");
-    lv_obj_set_style_text_color(g_touch_counter_label, lv_color_white(), 0);
-    lv_obj_align(g_touch_counter_label, LV_ALIGN_TOP_LEFT, 12, 10);
+    g_labelTitle = lv_label_create(scr);
+    lv_label_set_text(g_labelTitle, "智能储物柜");
+    lv_obj_set_style_text_color(g_labelTitle, lv_color_white(), 0);
+    lv_obj_set_style_text_font(g_labelTitle, LV_FONT_DEFAULT, 0);
+    lv_obj_align(g_labelTitle, LV_ALIGN_TOP_LEFT, 20, 14);
 
-    g_uplink_counter = 0;
-    g_uplink_counter_label = lv_label_create(scr);
-    lv_label_set_text(g_uplink_counter_label, "Uplink: 0");
-    lv_obj_set_style_text_color(g_uplink_counter_label, lv_color_white(), 0);
-    lv_obj_set_style_text_opa(g_uplink_counter_label, LV_OPA_90, 0);
-    lv_obj_align(g_uplink_counter_label, LV_ALIGN_TOP_LEFT, 12, 34);
+    g_labelNet = lv_label_create(scr);
+    lv_label_set_text(g_labelNet, "网络: --");
+    lv_obj_set_style_text_color(g_labelNet, lv_color_hex(0xCDE7FF), 0);
+    lv_obj_align(g_labelNet, LV_ALIGN_TOP_RIGHT, -20, 14);
 
-    /* 中央卡片容器，颜色 0x3388BB */
-    lv_obj_t * card = lv_obj_create(scr);
-    lv_obj_set_size(card, 560, 300);
-    lv_obj_align(card, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(card, 26, 0);
-    lv_obj_set_style_bg_color(card, lv_color_hex(0x3388BB), 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(card, 1, 0);
-    lv_obj_set_style_border_color(card, lv_color_hex(0x7FD3FF), 0);
-    lv_obj_set_style_border_opa(card, LV_OPA_40, 0);
-    lv_obj_set_style_shadow_width(card, 22, 0);
-    lv_obj_set_style_shadow_color(card, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_shadow_opa(card, LV_OPA_30, 0);
-    lv_obj_set_style_pad_all(card, 24, 0);
+    g_labelState = lv_label_create(scr);
+    lv_label_set_text(g_labelState, "状态: 初始化");
+    lv_obj_set_style_text_color(g_labelState, lv_color_white(), 0);
+    lv_obj_align(g_labelState, LV_ALIGN_TOP_LEFT, 20, 50);
 
-    /* 装饰 */
-    lv_obj_t * dot = lv_obj_create(card);
-    lv_obj_set_size(dot, 22, 22);
-    lv_obj_align(dot, LV_ALIGN_TOP_LEFT, 10, 10);
-    lv_obj_remove_flag(dot, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(dot, lv_color_hex(0x2EE6D6), 0);
-    lv_obj_set_style_bg_opa(dot, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(dot, 0, 0);
+    g_labelHint = lv_label_create(scr);
+    lv_label_set_text(g_labelHint, "请先选择门位");
+    lv_obj_set_style_text_color(g_labelHint, lv_color_hex(0xDCEEFF), 0);
+    lv_obj_align(g_labelHint, LV_ALIGN_TOP_LEFT, 20, 80);
 
-    /* 欢迎信息 */
-    lv_obj_t * welcome = lv_label_create(card);
-    lv_label_set_text(welcome, "歡迎使用");
-    lv_obj_set_style_text_color(welcome, lv_color_white(), 0);
-    lv_obj_set_style_transform_scale(welcome, (LV_SCALE_NONE * 5) / 4, 0);
-    lv_obj_set_style_transform_pivot_x(welcome, 0, 0);
-    lv_obj_set_style_transform_pivot_y(welcome, 0, 0);
-    lv_obj_align(welcome, LV_ALIGN_TOP_LEFT, 44, 8);
+    g_labelResult = lv_label_create(scr);
+    lv_label_set_text(g_labelResult, "");
+    lv_obj_set_width(g_labelResult, 760);
+    lv_obj_set_style_text_color(g_labelResult, lv_color_hex(0xFFD9A8), 0);
+    lv_obj_align(g_labelResult, LV_ALIGN_TOP_LEFT, 20, 110);
 
-    lv_obj_t * info = lv_label_create(card);
-    lv_label_set_text_fmt(info,
-                          "STM32F429 | LVGL %d.%d.%d | 中文可用",
-                          (int)LVGL_VERSION_MAJOR,
-                          (int)LVGL_VERSION_MINOR,
-                          (int)LVGL_VERSION_PATCH);
-    lv_obj_set_style_text_color(info, lv_color_white(), 0);
-    lv_obj_set_style_text_opa(info, LV_OPA_90, 0);
-    lv_obj_update_layout(info);
-    lv_obj_set_style_transform_scale(info, (LV_SCALE_NONE * 5) / 4, 0);
-    lv_obj_set_style_transform_pivot_x(info, lv_obj_get_width(info) / 2, 0);
-    lv_obj_set_style_transform_pivot_y(info, lv_obj_get_height(info) / 2, 0);
-    lv_obj_align(info, LV_ALIGN_CENTER, 0, 0);
+    locker_panel = lv_obj_create(scr);
+    lv_obj_set_size(locker_panel, 760, 220);
+    lv_obj_align(locker_panel, LV_ALIGN_TOP_MID, 0, 150);
+    lv_obj_set_style_bg_color(locker_panel, lv_color_hex(0x184264), 0);
+    lv_obj_set_style_border_width(locker_panel, 1, 0);
+    lv_obj_set_style_border_color(locker_panel, lv_color_hex(0x74A8D8), 0);
+    lv_obj_set_style_radius(locker_panel, 12, 0);
+    lv_obj_set_style_pad_all(locker_panel, 16, 0);
+    lv_obj_remove_flag(locker_panel, LV_OBJ_FLAG_SCROLLABLE);
 
-    /* 卡片：獲取信息 */
-    lv_obj_t * get_info = lv_obj_create(card);
-    lv_obj_set_size(get_info, 150, 46);
-    lv_obj_align(get_info, LV_ALIGN_BOTTOM_MID, -100, -40);
-    lv_obj_remove_flag(get_info, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(get_info, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_radius(get_info, 14, 0);
-    lv_obj_set_style_bg_color(get_info, lv_color_hex(0xEAF5FF), 0);
-    lv_obj_set_style_bg_opa(get_info, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(get_info, 0, 0);
-    lv_obj_set_style_shadow_width(get_info, 14, 0);
-    lv_obj_set_style_shadow_color(get_info, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_shadow_opa(get_info, LV_OPA_20, 0);
-    lv_obj_add_event_cb(get_info, touch_plus_event_cb, LV_EVENT_CLICKED, NULL);
+    lv_obj_set_flex_flow(locker_panel, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_flex_align(locker_panel, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER);
 
-    lv_obj_t * get_info_label = lv_label_create(get_info);
-    lv_label_set_text(get_info_label, "獲取信息");
-    lv_obj_set_style_text_color(get_info_label, lv_color_hex(0x1B4D9B), 0);
-    lv_obj_center(get_info_label);
+    /*
+     * 当前仓库裁剪版 LVGL 未包含 button 组件，
+     * 这里使用可点击 lv_obj 作为“按钮”容器。
+     */
+    for (i = 0U; i < APP_LOCKER_MAX_COUNT; i++)
+    {
+        g_lockerBtns[i] = lv_obj_create(locker_panel);
+        lv_obj_set_size(g_lockerBtns[i], 170, 80);
+        lv_obj_add_flag(g_lockerBtns[i], LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(g_lockerBtns[i], LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_event_cb(g_lockerBtns[i], Task_Lvgl_LockerBtnCb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
 
-    /* 卡片：上傳信息 */
-    lv_obj_t * upload_info = lv_obj_create(card);
-    lv_obj_set_size(upload_info, 150, 46);
-    lv_obj_align(upload_info, LV_ALIGN_BOTTOM_MID, 100, -40);
-    lv_obj_remove_flag(upload_info, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(upload_info, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_set_style_radius(upload_info, 14, 0);
-    lv_obj_set_style_bg_color(upload_info, lv_color_hex(0xEAF5FF), 0);
-    lv_obj_set_style_bg_opa(upload_info, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(upload_info, 0, 0);
-    lv_obj_set_style_shadow_width(upload_info, 14, 0);
-    lv_obj_set_style_shadow_color(upload_info, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_shadow_opa(upload_info, LV_OPA_20, 0);
-    lv_obj_add_event_cb(upload_info, uplink_event_cb, LV_EVENT_CLICKED, NULL);
+        g_lockerBtnLabels[i] = lv_label_create(g_lockerBtns[i]);
+        lv_label_set_text(g_lockerBtnLabels[i], Locker_GetId((uint8_t)i));
+        lv_obj_center(g_lockerBtnLabels[i]);
+    }
 
-    lv_obj_t * upload_info_label = lv_label_create(upload_info);
-    lv_label_set_text(upload_info_label, "上傳信息");
-    lv_obj_set_style_text_color(upload_info_label, lv_color_hex(0x1B4D9B), 0);
-    lv_obj_center(upload_info_label);
+    g_btnMain = lv_obj_create(scr);
+    lv_obj_set_size(g_btnMain, 220, 56);
+    lv_obj_add_flag(g_btnMain, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(g_btnMain, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(g_btnMain, LV_ALIGN_BOTTOM_LEFT, 40, -24);
+    lv_obj_add_event_cb(g_btnMain, Task_Lvgl_MainBtnCb, LV_EVENT_CLICKED, NULL);
+    g_btnMainLabel = lv_label_create(g_btnMain);
+    lv_label_set_text(g_btnMainLabel, "主操作");
+    lv_obj_center(g_btnMainLabel);
+
+    g_btnSecondary = lv_obj_create(scr);
+    lv_obj_set_size(g_btnSecondary, 220, 56);
+    lv_obj_add_flag(g_btnSecondary, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(g_btnSecondary, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_align(g_btnSecondary, LV_ALIGN_BOTTOM_RIGHT, -40, -24);
+    lv_obj_add_event_cb(g_btnSecondary, Task_Lvgl_SecondaryBtnCb, LV_EVENT_CLICKED, NULL);
+    g_btnSecondaryLabel = lv_label_create(g_btnSecondary);
+    lv_label_set_text(g_btnSecondaryLabel, "返回");
+    lv_obj_center(g_btnSecondaryLabel);
+
+    (void)memset(&g_lastSession, 0xFF, sizeof(g_lastSession));
 }
 
+/**
+ * @brief 根据会话状态刷新 UI
+ */
+static void Task_Lvgl_RefreshUi(void)
+{
+    AppSessionData_TypeDef session;
+    uint32_t i;
+    const char *hint = "";
+
+    AppData_GetSessionData(&session);
+
+    /* 状态主文案 */
+    lv_label_set_text_fmt(g_labelState,
+                          "状态: %s%s",
+                          Task_Lvgl_StateText(session.state),
+                          (session.selected_locker_id[0] != '\0') ? "" : "");
+
+    /* 网络状态 */
+    if (session.state == APP_SESSION_STATE_NET_FAIL)
+    {
+        lv_label_set_text(g_labelNet, "网络: 异常");
+        lv_obj_set_style_text_color(g_labelNet, lv_color_hex(0xFFB66D), 0);
+    }
+    else if (session.network_ok != 0U)
+    {
+        lv_label_set_text(g_labelNet, "网络: 正常");
+        lv_obj_set_style_text_color(g_labelNet, lv_color_hex(0x9FF5B5), 0);
+    }
+    else
+    {
+        lv_label_set_text(g_labelNet, "网络: 未知");
+        lv_obj_set_style_text_color(g_labelNet, lv_color_hex(0xCDE7FF), 0);
+    }
+
+    /* 提示语 */
+    switch (session.state)
+    {
+    case APP_SESSION_STATE_IDLE_SELECT:
+        hint = "请选择门位并刷校园卡";
+        break;
+    case APP_SESSION_STATE_WAIT_CARD:
+        hint = "请将校园卡贴近读卡区";
+        break;
+    case APP_SESSION_STATE_READING_CARD:
+        hint = "正在读取数据，请保持刷卡姿势";
+        break;
+    case APP_SESSION_STATE_AUTH_PENDING:
+        hint = "正在上传并等待上级响应";
+        break;
+    case APP_SESSION_STATE_AUTH_ALLOW_OPENED:
+        hint = "请取物并关门，然后点击确认";
+        break;
+    case APP_SESSION_STATE_AUTH_DENY:
+        hint = "可重试或返回重新选择门位";
+        break;
+    case APP_SESSION_STATE_NET_FAIL:
+        hint = "网络异常，暂不可开门";
+        break;
+    case APP_SESSION_STATE_DONE:
+        hint = "即将返回首页";
+        break;
+    default:
+        hint = "";
+        break;
+    }
+
+    lv_label_set_text(g_labelHint, hint);
+
+    /* 结果区 */
+    if (session.message[0] != '\0')
+    {
+        lv_label_set_text_fmt(g_labelResult,
+                              "门位:%s  会话:%lu  HTTP:%u  CODE:%ld  %s",
+                              session.selected_locker_id,
+                              (unsigned long)session.session_id,
+                              (unsigned)session.last_http_status,
+                              (long)session.last_code,
+                              session.message);
+    }
+    else
+    {
+        lv_label_set_text_fmt(g_labelResult,
+                              "门位:%s  会话:%lu",
+                              session.selected_locker_id,
+                              (unsigned long)session.session_id);
+    }
+
+    /* 门位按钮高亮 */
+    for (i = 0U; i < APP_LOCKER_MAX_COUNT; i++)
+    {
+        if ((session.locker_selected != 0U) && (session.selected_locker_index == i))
+        {
+            lv_obj_set_style_bg_color(g_lockerBtns[i], lv_color_hex(0x2AA56F), 0);
+            lv_obj_set_style_text_color(g_lockerBtnLabels[i], lv_color_white(), 0);
+        }
+        else
+        {
+            lv_obj_set_style_bg_color(g_lockerBtns[i], lv_color_hex(0x2B5E87), 0);
+            lv_obj_set_style_text_color(g_lockerBtnLabels[i], lv_color_hex(0xEAF5FF), 0);
+        }
+    }
+
+    /* 主/次按钮按状态切换 */
+    if (session.state == APP_SESSION_STATE_AUTH_ALLOW_OPENED)
+    {
+        lv_obj_remove_flag(g_btnMain, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(g_btnSecondary, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(g_btnMainLabel, "已取物并关门");
+        lv_label_set_text(g_btnSecondaryLabel, "返回首页");
+    }
+    else if ((session.state == APP_SESSION_STATE_AUTH_DENY) ||
+             (session.state == APP_SESSION_STATE_NET_FAIL))
+    {
+        lv_obj_remove_flag(g_btnMain, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(g_btnSecondary, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(g_btnMainLabel, "重试");
+        lv_label_set_text(g_btnSecondaryLabel, "返回");
+    }
+    else if (session.state == APP_SESSION_STATE_WAIT_CARD)
+    {
+        lv_obj_add_flag(g_btnMain, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_remove_flag(g_btnSecondary, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(g_btnSecondaryLabel, "返回");
+    }
+    else
+    {
+        lv_obj_add_flag(g_btnMain, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(g_btnSecondary, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    g_lastSession = session;
+}
+
+/**
+ * @brief 任务初始化
+ */
 BaseType_t Task_Lvgl_Init(void)
 {
-    /* LCD/LTDC/SDRAM */
     LCD_Init();
     LCD_LayerInit();
 
-    /* 让 Layer2 完全透明，避免其不透明像素覆盖 Layer1（LVGL 当前写 Layer1 帧缓冲） */
     LCD_SetLayer(LCD_FOREGROUND_LAYER);
     LCD_SetTransparency(0);
 
-    /* LVGL 显示目标：Layer1（LCD_FRAME_BUFFER） */
     LCD_SetLayer(LCD_BACKGROUND_LAYER);
     LCD_Clear(LCD_COLOR565_BLACK);
 
-    /* 触摸初始化（I2C + GT9xx） */
     I2C_Touch_Init();
     (void)GTP_Init_Panel();
 
-    /* LVGL 初始化 + Port 对接 */
     lv_init();
-    lv_display_t * disp = lv_port_disp_init();
-    if(disp == NULL)
+
+    lv_display_t *disp = lv_port_disp_init();
+    if (disp == NULL)
     {
         return pdFAIL;
     }
+
     lv_display_set_default(disp);
     (void)lv_port_indev_init(disp);
 
-    /* Demo：欢迎界面 + 点击计数 */
-    lvgl_demo_create();
+    Task_Lvgl_CreateUi();
+    Task_Lvgl_RefreshUi();
 
     return pdPASS;
 }
 
-void Task_Lvgl(void * pvParameters)
+/**
+ * @brief LVGL 主任务
+ */
+void Task_Lvgl(void *pvParameters)
 {
+    TickType_t last = xTaskGetTickCount();
+    uint32_t refresh_acc = 0U;
+
     (void)pvParameters;
 
-    TickType_t last = xTaskGetTickCount();
-
-    for(;;)
+    for (;;)
     {
         TickType_t now = xTaskGetTickCount();
         uint32_t diff_ms = (uint32_t)(now - last) * (uint32_t)portTICK_PERIOD_MS;
         last = now;
-        if(diff_ms) lv_tick_inc(diff_ms);
+
+        if (diff_ms != 0U)
+        {
+            lv_tick_inc(diff_ms);
+            refresh_acc += diff_ms;
+        }
+
+        /* 每 100ms 刷新一次业务 UI（避免频繁重绘） */
+        if (refresh_acc >= 100U)
+        {
+            refresh_acc = 0U;
+            Task_Lvgl_RefreshUi();
+        }
 
         uint32_t wait_ms = lv_timer_handler();
-        if(wait_ms < 1U) wait_ms = 1U;
-        if(wait_ms > 20U) wait_ms = 20U;
+        if (wait_ms < 1U)
+        {
+            wait_ms = 1U;
+        }
+        if (wait_ms > 20U)
+        {
+            wait_ms = 20U;
+        }
 
         vTaskDelay(pdMS_TO_TICKS(wait_ms));
     }
@@ -228,3 +450,5 @@ BaseType_t Task_Lvgl_Create(void)
                        (UBaseType_t)TASK_LVGL_PRIORITY,
                        (TaskHandle_t *)&Task_Lvgl_Handle);
 }
+
+

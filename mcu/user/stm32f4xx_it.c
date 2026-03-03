@@ -1,4 +1,4 @@
-/**
+﻿/**
  ******************************************************************************
  * @file    FMC_SDRAM/stm32f4xx_it.c
  * @author  MCD Application Team
@@ -30,11 +30,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "stm32f4xx_it.h"
 
-#include "FreeRTOS.h" //FreeRTOS使用
+#include "FreeRTOS.h" // FreeRTOS usage
 #include "task.h"
-#include "bsp_adc.h" // ADC EOC interrupt handler
-
-extern __IO uint16_t ADC_ConvertedValue;
 
 /** @addtogroup STM32F429I_DISCOVERY_Examples
  * @{
@@ -131,7 +128,7 @@ void DebugMon_Handler(void)
  * @retval None
  */
 extern void xPortSysTickHandler(void);
-// systick中断服务函数
+/* SysTick interrupt service routine */
 void SysTick_Handler(void)
 {
 #if (INCLUDE_xTaskGetSchedulerState == 1)
@@ -158,16 +155,6 @@ void SysTick_Handler(void)
 /**
  * @}
  */
-
-void ADC_IRQHandler(void)
-{
-    if (ADC_GetITStatus(ADCx, ADC_IT_EOC) != RESET)
-    {
-        ADC_ConvertedValue = ADC_GetConversionValue(ADCx);
-        ADC_ClearITPendingBit(ADCx, ADC_IT_EOC);
-    }
-}
-
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
 
 #ifdef USE_FULL_ASSERT
@@ -180,3 +167,6 @@ void assert_failed(uint8_t *file, uint32_t line)
     }
 }
 #endif
+
+
+

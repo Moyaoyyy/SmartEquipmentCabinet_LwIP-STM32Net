@@ -30,14 +30,16 @@
                 "${workspaceFolder}/mcu/bsp/touch/Inc",
                 "${workspaceFolder}/mcu/bsp/font/Inc",
                 "${workspaceFolder}/mcu/bsp/nfc/Inc",
+                "${workspaceFolder}/mcu/bsp/locker/Inc",
 
                 // APP 应用层头文件示例，如有新增应用，可在此添加
                 "${workspaceFolder}/mcu/app/app_data/Inc",
                 "${workspaceFolder}/mcu/app/app_lwip/Inc",
-                "${workspaceFolder}/mcu/app/task_light/Inc",
                 "${workspaceFolder}/mcu/app/app_uplink/Inc",
-                "${workspaceFolder}/mcu/app/task_uplink_adc/Inc",
+                "${workspaceFolder}/mcu/app/task_uplink/Inc",
                 "${workspaceFolder}/mcu/app/task_lvgl/Inc",
+                "${workspaceFolder}/mcu/app/app_auth/Inc",
+                "${workspaceFolder}/mcu/app/task_rfid_auth/Inc",
                 
                 // 扩展工具库
                 "${workspaceFolder}/mcu/libx",
