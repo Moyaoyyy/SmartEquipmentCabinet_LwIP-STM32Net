@@ -9,6 +9,7 @@
   - 同步鉴权请求 `RFID_AUTH_REQ`
   - 异步审计事件 `RFID_AUDIT`
 - 网络与系统：LwIP + FreeRTOS（`NO_SYS=0`）。
+- 上级服务：新增 `server/`（FastAPI + SQLite），可先在电脑本机联调，再迁移到 RK3568。
 
 ## 快速开始
 - 配置（对应 VSCode 任务 `CMake Configure`）：
@@ -27,8 +28,10 @@
 - [仓库结构与模块职责](docs/repo-structure.md)
 - [协同开发指南](docs/handover.md)
 - [未来接入电磁门阀方案](docs/door-actuator-integration.md)
+- [上级服务说明](server/README.md)
 
 ## 版本与状态
 - 当前任务命名为 `Task_Uplink`，历史命名 `Task_UplinkADC` 已下线。
 - 旧光照测试链路（`Task_Light` / `LIGHT_ADC`）已下线。
 - 当前 `mcu/app` 生效模块：`app_auth`、`app_data`、`app_lwip`、`app_uplink`、`task_lvgl`、`task_rfid_auth`、`task_uplink`。
+- 上级服务部署策略：先本机联调，再迁移 RK3568（代码与接口保持一致）。
